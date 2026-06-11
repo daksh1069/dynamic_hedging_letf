@@ -249,8 +249,6 @@ these raw files. EDA and the backtest read directly from `data/*.xlsx`.
 
 ## 8. Out of Scope
 
-- Other tickers (MSTR, MSOS, SMCI, COIN, PLTR, NVO, MU, AVGO, NVDA, SOXX) — teammates'
-  own workstreams.
 - Puts — calls only.
 - Bid-ask spreads, Greeks, implied vol — confirmed not needed by Nitesh.
 - Intraday data — end-of-day only.
