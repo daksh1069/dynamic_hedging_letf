@@ -1,20 +1,27 @@
 """
-Parse data/TSLA_calls_PXLAST_full_filled.xlsx (the
-Bloomberg BDH pull: PX_LAST + PX_VOLUME for all 3,797 TSLA calls,
+Parse data/<TICKER>_calls_PXLAST_full_filled.xlsx (the
+Bloomberg BDH pull: PX_LAST + PX_VOLUME for all filtered <TICKER> calls,
 2020-01-02 -> 2026-06-10) into a clean long-format table.
 
-Output: data/processed/TSLA_calls_close.parquet
+Output: data/processed/<TICKER>_calls_close.parquet
   columns: raw_id, figi, expiry, strike, date, px_last, px_volume
+
+Usage: python excel_formula/scripts/07_parse_bdh_full.py TICKER
 """
 import datetime
+import sys
 from pathlib import Path
 
 import openpyxl
 import pandas as pd
 
+if len(sys.argv) < 2:
+    sys.exit("Usage: python excel_formula/scripts/07_parse_bdh_full.py TICKER")
+TICKER = sys.argv[1]
+
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "data"
-PATH = DATA_DIR / "TSLA_calls_PXLAST_full_filled.xlsx"
+PATH = DATA_DIR / f"{TICKER}_calls_PXLAST_full_filled.xlsx"
 
 BLOCK_WIDTH = 4
 
@@ -60,7 +67,7 @@ def main():
     long_df["px_last"] = pd.to_numeric(long_df["px_last"], errors="coerce")
     long_df["px_volume"] = pd.to_numeric(long_df["px_volume"], errors="coerce")
 
-    out_path = DATA_DIR / "processed" / "TSLA_calls_close.parquet"
+    out_path = DATA_DIR / "processed" / f"{TICKER}_calls_close.parquet"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     long_df.to_parquet(out_path)
 

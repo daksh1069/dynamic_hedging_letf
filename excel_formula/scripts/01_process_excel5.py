@@ -2,10 +2,11 @@
 Stage 0a: extract every unique call-option BBG ID from
 data/Excel5_OptionTickers_Final.xlsx (one sheet per
 underlying, across the whole team's tickers) and write
-data/Excel5b_UniqueTickers_ForDecode.xlsx, one sheet per
+excel_formula/Excel5b_UniqueTickers_ForDecode.xlsx, one sheet per
 underlying with the deduplicated IDs in column A.
 
-Output feeds excel_formula/scripts/02_decode_openfigi.py.
+Output feeds excel_formula/scripts/02_decode_openfigi.py (once moved to
+data/).
 
 No API calls -- pure local file generation, free.
 """
@@ -21,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "data"
 
 INPUT_FILE  = DATA_DIR / "Excel5_OptionTickers_Final.xlsx"
-OUTPUT_FILE = DATA_DIR / "Excel5b_UniqueTickers_ForDecode.xlsx"
+OUTPUT_FILE = ROOT / "excel_formula" / "Excel5b_UniqueTickers_ForDecode.xlsx"
 
 SKIP_SHEETS = {"INDEX", "HOW_TO_USE"}
 

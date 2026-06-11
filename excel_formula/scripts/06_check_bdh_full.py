@@ -1,5 +1,5 @@
 """
-Sanity-check data/TSLA_calls_PXLAST_full_filled.xlsx.
+Sanity-check data/<TICKER>_calls_PXLAST_full_filled.xlsx.
 
 For each Batch_NN sheet, walk each [Date | PX_LAST | PX_VOLUME | blank] block
 (one per security) and check:
@@ -7,15 +7,20 @@ For each Batch_NN sheet, walk each [Date | PX_LAST | PX_VOLUME | blank] block
   - how many data rows it returned, and the date range covered
   - flags any block with zero rows or error values
 
-Prints a summary across all 19 batches / 3,797 securities.
+Usage: python excel_formula/scripts/06_check_bdh_full.py TICKER
 """
 import datetime
+import sys
 from pathlib import Path
 
 import openpyxl
 
+if len(sys.argv) < 2:
+    sys.exit("Usage: python excel_formula/scripts/06_check_bdh_full.py TICKER")
+TICKER = sys.argv[1]
+
 ROOT = Path(__file__).resolve().parents[2]
-PATH = ROOT / "data" / "TSLA_calls_PXLAST_full_filled.xlsx"
+PATH = ROOT / "data" / f"{TICKER}_calls_PXLAST_full_filled.xlsx"
 
 BLOCK_WIDTH = 4
 ERROR_STRINGS = {"#NAME?", "#N/A", "#REF!", "#VALUE!", "#NULL!", "#DIV/0!", "#NUM!"}

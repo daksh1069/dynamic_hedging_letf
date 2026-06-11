@@ -7,8 +7,9 @@ data/decoded/.
 
 Usage
 -----
-    export OPENFIGI_API_KEY="your-key-here"
-    python excel_formula/scripts/02_decode_openfigi.py
+    Set OPENFIGI_API_KEY in the project's .env (loaded automatically), or
+    export it in the shell, then:
+        python excel_formula/scripts/02_decode_openfigi.py
 
 Resume: just re-run the same command. Already-decoded FIGIs are loaded
 from decoded/_checkpoint.json and skipped automatically -- if the
@@ -28,6 +29,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import requests
 import pandas as pd
+from dotenv import load_dotenv
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -35,6 +37,8 @@ from openpyxl.utils import get_column_letter
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "data"
+
+load_dotenv(dotenv_path=ROOT / ".env")
 
 INPUT_FILE    = DATA_DIR / "Excel5b_UniqueTickers_ForDecode.xlsx"
 OUTPUT_DIR    = DATA_DIR / "decoded"
