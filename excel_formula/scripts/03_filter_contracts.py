@@ -5,7 +5,7 @@ the backtest, and write into data/filtered/:
   - <TICKER>_calls_filtered.xlsx  (one per underlying)
   - ALL_calls_filtered.xlsx        (master summary)
   - Excel6_BDH_Ready.xlsx          (Bloomberg BDH formulas -- superseded,
-    Nitesh later confirmed only PX_LAST is needed; kept for reference)
+    only PX_LAST is needed; kept for reference)
 
 Filter criteria applied in order:
   1. Calls only                (drops ~50%)

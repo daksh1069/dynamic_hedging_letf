@@ -8,8 +8,7 @@ positions.
 
 ## 1. Project Context
 
-**Project**: "Optimal Hedging Strategy of a Leveraged ETF Position" — a team project
-(mentor: **Nitesh Kumar**).
+**Project**: "Optimal Hedging Strategy of a Leveraged ETF Position" — a team project.
 
 **Strategy direction** (decided in the team's 2026-06-04 meeting): **Convexity
 Protection** — short the leveraged ETF (LETF) and hold a long call option on either the
@@ -26,7 +25,7 @@ NVDA/NVDL, MSOS/MSOX. **This repo covers TSLA / TSLL** (Tesla / Direxion Daily T
 2X), owned by **Daksh Kumar**, paired with teammate Shubham Balodi. Other tickers are
 teammates' own work and out of scope here.
 
-**Data scope** (per Nitesh's guidance, 2026-06-10): only **`PX_LAST`** (closing price)
+**Data scope** (decided 2026-06-10): only **`PX_LAST`** (closing price)
 is needed for the options — no bid-ask, Greeks, IV, or intraday data. Contract term
 should be **< ~1 quarter (~<90 DTE)**, applied as a filter at backtest time. End-of-day
 data is sufficient throughout.
@@ -238,7 +237,7 @@ contracts), and `Benchmarks.xlsx` (SPY/QQQ/VIX/T-bill). The `excel_formula/` pip
 (steps 00a-00b, 01-03, 05-09) does not need to be re-run for TSLA — it was used to *produce*
 these raw files. EDA and the backtest read directly from `data/*.xlsx`.
 
-**Next steps** (per Nitesh: "start coding a simple backtest"):
+**Next steps** ("start coding a simple backtest"):
 1. Build a simple backtest: **short TSLL (LETF) + long TSLA call**, across moneyness
    buckets (ATM, 10% OTM, 20% OTM), term < ~1 quarter.
 2. For each rebalance date, classify each call by moneyness using TSLA spot close
@@ -250,5 +249,5 @@ these raw files. EDA and the backtest read directly from `data/*.xlsx`.
 ## 8. Out of Scope
 
 - Puts — calls only.
-- Bid-ask spreads, Greeks, implied vol — confirmed not needed by Nitesh.
+- Bid-ask spreads, Greeks, implied vol — confirmed not needed.
 - Intraday data — end-of-day only.
