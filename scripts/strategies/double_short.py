@@ -27,6 +27,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts" / "eda"))
 sys.path.insert(0, str(ROOT / "scripts" / "backtest"))
 
+from capture import capture_stdout
 from data_loader import load_tsll
 from engine import buy_and_hold_equity, rebalanced_equity
 from metrics import summarize, max_drawdown
@@ -90,4 +91,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    with capture_stdout(OUT_DIR / "results.txt"):
+        main()

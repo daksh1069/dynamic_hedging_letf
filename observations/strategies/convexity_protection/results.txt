@@ -1,0 +1,13 @@
+==============================================================================
+STRATEGY 3 -- CONVEXITY PROTECTION (short TSLL + long TSLA call(s)): RISK METRICS
+==============================================================================
+Target DTE: 60d   Roll trigger: DTE < 14d   Max DTE: 180d   Sizing: DELTA-NEUTRAL (TSLL lever=2.0x, r=5%, vol window=21d)
+
+Strategy    CAGR  Ann. Vol  Sharpe  Max DD  Calmar  Unhedged Days  Total Hedge Cost $
+     ATM -0.1256    0.3750 -0.1345 -0.4630 -0.2713              0              5.7314
+ 10% OTM -0.0183    0.3381  0.1563 -0.3882 -0.0471              0              4.9032
+ 20% OTM  0.0276    0.4787  0.3266 -0.4554  0.0607              9              5.3206
+  Spread  0.0216    0.7688  0.3887 -0.8295  0.0260              0              2.1774
+
+Figures saved to /Users/dakshkumar/NCSU/Summer Session 1 2026/FIM 675/dynamic_hedging_project/observations/strategies/convexity_protection/
+Equity curves saved to /Users/dakshkumar/NCSU/Summer Session 1 2026/FIM 675/dynamic_hedging_project/results/convexity_protection/equity_{atm,otm10,otm20,spread}.csv

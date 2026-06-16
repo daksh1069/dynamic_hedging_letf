@@ -1,0 +1,51 @@
+Spot data inspection — generated from /Users/dakshkumar/NCSU/Summer Session 1 2026/FIM 675/dynamic_hedging_project/scripts/eda/miscellaneous/inspect_spot_data.py
+Project root: /Users/dakshkumar/NCSU/Summer Session 1 2026/FIM 675/dynamic_hedging_project
+
+============================================================
+  TSLA spot  (data/Excel3_Underlying_Data.xlsx → sheet TSLA)
+============================================================
+Shape   : 1,571 rows × 8 columns
+Columns : ['Date', 'Open', 'High', 'Low', 'Close', 'Total Return Idx', 'Volume', 'Mkt Cap ($M)']
+
+Date range: 2020-06-01 → 2026-06-08
+
+Close statistics:
+count    1571.000000
+mean      262.888842
+std        91.589954
+min        57.625300
+25%       199.868350
+50%       246.390000
+75%       327.941650
+max       489.880000
+
+Missing values: none
+
+CBA window (2022-08-12 → 2026-06-10):
+  Rows in window : 997
+  Close in window: min=108.10  max=489.88  mean=279.80
+
+============================================================
+  TSLL OHLCV  (data/TSLL_ohlcv.xlsx (yfinance))
+============================================================
+Shape   : 963 rows × 7 columns
+Columns : ['Date', 'Adj Close', 'Close', 'High', 'Low', 'Open', 'Volume']
+
+Date range: 2022-08-09 → 2026-06-10
+
+Close statistics:
+count    963.000000
+mean      14.221677
+std        5.493422
+min        5.090000
+25%       10.345000
+50%       13.070000
+75%       16.840000
+max       40.090000
+
+Missing values: none
+
+CBA window (2022-08-12 → 2026-06-10):
+  Rows in window : 960
+  Close in window: min=5.09  max=40.09  mean=14.19
+

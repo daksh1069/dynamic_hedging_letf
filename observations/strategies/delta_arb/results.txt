@@ -1,0 +1,11 @@
+==============================================================================
+STRATEGY 2 -- DELTA-ADJUSTED ARBITRAGE (long h*TSLA + short TSLL): RISK METRICS
+==============================================================================
+          Strategy   CAGR  Ann. Vol  Sharpe  Max DD  Calmar
+Dynamic Beta Hedge 0.1546    0.0544  2.6894 -0.1003  1.5413
+   Static 2x Hedge 0.1594    0.1758  0.9588 -0.2370  0.6726
+
+Dynamic hedge ratio h_t (rolling 63d beta, lagged 1d): mean=1.787  min=1.482  max=2.005
+
+Figures saved to /Users/dakshkumar/NCSU/Summer Session 1 2026/FIM 675/dynamic_hedging_project/observations/strategies/delta_arb/
+Equity curve saved to /Users/dakshkumar/NCSU/Summer Session 1 2026/FIM 675/dynamic_hedging_project/results/delta_arb/equity.csv

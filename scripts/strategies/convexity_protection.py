@@ -43,6 +43,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts" / "eda"))
 sys.path.insert(0, str(ROOT / "scripts" / "backtest"))
 
+from capture import capture_stdout
 from data_loader import load_tsla_underlying, load_tsla_calls, load_tsll
 from metrics import summarize
 
@@ -52,10 +53,14 @@ RESULTS_DIR = ROOT / "results" / "convexity_protection"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 sys.path.insert(0, str(ROOT / "scripts" / "backtest"))
-from options_selection import select_contract  # noqa: E402
+from options_selection import select_contract, bs_delta  # noqa: E402
 
-TARGET_DTE = 60
-HEDGE_PCT = 0.02
+TARGET_DTE  = 180
+ROLL_DTE    = 14
+MAX_DTE     = 180
+TSLL_LEVER  = 2.0   # TSLL nominal leverage vs TSLA
+R_RF        = 0.05  # risk-free rate proxy (annualised)
+VOL_WINDOW  = 21    # days for realised-vol estimate used in BS delta
 
 VARIANTS = {
     "ATM": (["ATM"], "atm"),
@@ -65,22 +70,26 @@ VARIANTS = {
 }
 
 
-def simulate(returns, calls, spot, rebalance_dates, moneyness_buckets, price_lookup):
-    """Buy & hold short $1 TSLL (Strategy 1's baseline equity, never reset)
-    plus a long (and possibly short, for a spread) TSLA call position rolled
-    monthly. `moneyness_buckets` has 1 entry for a single long call, or 2
-    entries for a long/short vertical spread (long first, short second).
+def simulate(returns, calls, spot, moneyness_buckets, price_lookup, sigma_series):
+    """Buy & hold short $1 TSLL plus a delta-neutral long (or spread) TSLA call.
+
+    At each roll the call is sized so its dollar delta exactly offsets the
+    short-TSLL dollar delta: n = (TSLL_LEVER × cum_tsll) / (Δ × 100 × spot).
+    As TSLL appreciates, the required hedge grows automatically.
+
+    `moneyness_buckets` has 1 entry (single long call) or 2 (long/short spread).
+    `sigma_series` is the rolling realised-vol of TSLA, indexed by date.
     """
-    rebal_set = set(rebalance_dates) | {returns.index[0]}
     signs = [1, -1][:len(moneyness_buckets)]
 
     cum_tsll = (1 + returns["TSLL"]).cumprod()
-    base_equity = 2.0 - cum_tsll  # Strategy 1's buy & hold short-TSLL equity
+    base_equity = 2.0 - cum_tsll
 
     equity = pd.Series(index=returns.index, dtype=float)
-    legs = []  # each: dict(sign, raw_id, strike, expiry, n, price)
+    legs = []
     option_pnl = 0.0
     n_unhedged = 0
+    total_hedge_cost = 0.0
 
     def mtm_price(raw_id, strike, expiry, date, last_known):
         if date > expiry:
@@ -91,36 +100,57 @@ def simulate(returns, calls, spot, rebalance_dates, moneyness_buckets, price_loo
         return last_known
 
     for d in returns.index:
-        if d in rebal_set:
-            # Close out existing legs at today's prices.
+        primary_dte = (legs[0]["expiry"] - d).days if legs else -1
+        need_roll = not legs or primary_dte < ROLL_DTE
+
+        if need_roll:
             for leg in legs:
                 px = mtm_price(leg["raw_id"], leg["strike"], leg["expiry"], d, leg["price"])
                 option_pnl += leg["sign"] * leg["n"] * 100 * (px - leg["price"])
 
-            # Roll into new contract(s), spending HEDGE_PCT of the fixed $1 notional.
             new_legs = []
             for bucket, sign in zip(moneyness_buckets, signs):
-                row = select_contract(calls, spot, d, bucket, TARGET_DTE)
+                row = select_contract(calls, spot, d, bucket, TARGET_DTE, max_dte=MAX_DTE)
                 if row is None:
                     new_legs = []
                     break
                 new_legs.append({
-                    "sign": sign, "raw_id": row["raw_id"], "strike": row["strike"],
-                    "expiry": row["expiry"], "price": float(row["px_last"]),
+                    "sign": sign, "raw_id": row["raw_id"],
+                    "strike": float(row["strike"]), "expiry": row["expiry"],
+                    "price": float(row["px_last"]),
                 })
+
             if new_legs:
+                S = float(spot.loc[d])
+                sigma = float(sigma_series.loc[d]) if d in sigma_series.index else 0.5
+
+                # Compute BS delta for each leg.
+                leg_deltas = []
+                for leg in new_legs:
+                    T = (leg["expiry"] - d).days / 365.25
+                    leg_deltas.append(bs_delta(S, leg["strike"], T, R_RF, sigma))
+
+                # Size so dollar delta of call(s) = dollar delta of short TSLL.
+                # For a spread, size by the LONG leg's delta — the short leg reduces
+                # premium cost but is not the sizing target (avoids n→∞ when Δ1≈Δ2).
+                sizing_delta = max(leg_deltas[0], 0.01)
+                short_delta = TSLL_LEVER * float(cum_tsll.loc[d])
+                n = short_delta / (sizing_delta * 100 * S)
+
                 net_premium = new_legs[0]["price"]
                 if len(new_legs) == 2:
                     net_premium -= new_legs[1]["price"]
+
                 if net_premium > 0:
-                    n = HEDGE_PCT * 1.0 / (net_premium * 100)
                     for leg in new_legs:
                         leg["n"] = n
                     legs = new_legs
+                    total_hedge_cost += n * 100 * net_premium
                 else:
                     legs = []
             else:
                 legs = []
+
             if not legs:
                 n_unhedged += 1
         else:
@@ -131,7 +161,7 @@ def simulate(returns, calls, spot, rebalance_dates, moneyness_buckets, price_loo
 
         equity.loc[d] = base_equity.loc[d] + option_pnl
 
-    return equity, n_unhedged
+    return equity, n_unhedged, total_hedge_cost
 
 
 def main():
@@ -140,28 +170,30 @@ def main():
     returns = r_tsll.rename("TSLL").to_frame()
 
     spot = load_tsla_underlying().set_index("Date")["Close"].reindex(returns.index).ffill()
+    r_tsla = spot.pct_change()
+    sigma_series = r_tsla.rolling(VOL_WINDOW).std() * (252 ** 0.5)
+    sigma_series = sigma_series.ffill().bfill()
+
     calls = load_tsla_calls()
     price_lookup = calls.set_index(["raw_id", "date"])["px_last"].to_dict()
-
-    # First common (returns x calls) date of each calendar month -> roll dates.
-    common = returns.index.intersection(pd.DatetimeIndex(calls["date"].unique())).sort_values()
-    periods = common.to_series().dt.to_period("M")
-    rebalance_dates = common[~periods.duplicated()]
 
     print("=" * 78)
     print("STRATEGY 3 -- CONVEXITY PROTECTION (short TSLL + long TSLA call(s)): RISK METRICS")
     print("=" * 78)
-    print(f"Target DTE at roll: {TARGET_DTE} days   Hedge spend: {HEDGE_PCT:.1%} of NAV   "
-          f"Roll dates: {len(rebalance_dates)} (monthly)\n")
+    print(f"Target DTE: {TARGET_DTE}d   Roll trigger: DTE < {ROLL_DTE}d   "
+          f"Max DTE: {MAX_DTE}d   Sizing: DELTA-NEUTRAL (TSLL lever={TSLL_LEVER}x, "
+          f"r={R_RF:.0%}, vol window={VOL_WINDOW}d)\n")
 
     rows = []
     curves = {}
     for name, (buckets, slug) in VARIANTS.items():
-        equity, n_unhedged = simulate(returns, calls, spot, rebalance_dates, buckets, price_lookup)
+        equity, n_unhedged, hedge_cost = simulate(
+            returns, calls, spot, buckets, price_lookup, sigma_series)
         curves[name] = (equity, slug)
         eq_returns = equity.pct_change().dropna()
         row = summarize(equity, eq_returns, name)
-        row["Unhedged Periods"] = n_unhedged
+        row["Unhedged Days"] = n_unhedged
+        row["Total Hedge Cost $"] = round(hedge_cost, 4)
         rows.append(row)
 
     metrics_df = pd.DataFrame(rows)
@@ -193,4 +225,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    with capture_stdout(OUT_DIR / "results.txt"):
+        main()

@@ -1,0 +1,145 @@
+Options data inspection — generated from /Users/dakshkumar/NCSU/Summer Session 1 2026/FIM 675/dynamic_hedging_project/scripts/eda/miscellaneous/inspect_options_data.py
+Project root: /Users/dakshkumar/NCSU/Summer Session 1 2026/FIM 675/dynamic_hedging_project
+
+============================================================
+  TSLA_calls  (TSLA_calls_close.parquet)
+============================================================
+File size : 2.5 MB
+Shape     : 532,258 rows × 7 columns
+Columns   : ['raw_id', 'figi', 'expiry', 'strike', 'date', 'px_last', 'px_volume']
+
+dtypes:
+raw_id               object
+figi                 object
+expiry       datetime64[ns]
+strike              float64
+date         datetime64[ns]
+px_last             float64
+px_volume           float64
+
+Date range      : 2020-01-02 → 2026-06-10
+Expiry range    : 2020-01-17 → 2026-12-18
+Unique contracts: 3,786
+Unique dates    : 1,618
+
+Sparsity
+  Possible (contract × date) cells : 6,125,748
+  Actual rows in parquet           : 532,258
+  Fill rate (rows / possible)      : 8.7%
+  px_last non-null rate            : 100.0%
+
+px_last statistics:
+count    532257.000000
+mean         61.131088
+std          98.127874
+min           0.010000
+25%          11.330000
+50%          32.350000
+75%          69.420000
+max        2048.270000
+
+px_volume statistics:
+count    532252.000000
+mean        579.274156
+std        5008.514028
+min           1.000000
+25%           7.000000
+50%          34.000000
+75%         166.000000
+max      643016.000000
+
+DTE statistics:
+count    532258.000000
+mean        247.806847
+std         218.074826
+min           0.000000
+25%          79.000000
+50%         179.000000
+75%         358.000000
+max        1001.000000
+  DTE < 0 (post-expiry rows) : 0
+
+Contracts per trading day:
+  min=54  median=373  mean=329.0  max=601
+
+Strike statistics:
+count    532258.000000
+mean        313.963724
+std         109.132728
+min          48.000000
+25%         233.330000
+50%         296.670000
+75%         390.000000
+max         595.000000
+
+============================================================
+  TSLL_calls  (TSLL_calls_close.parquet)
+============================================================
+File size : 0.2 MB
+Shape     : 46,867 rows × 7 columns
+Columns   : ['raw_id', 'figi', 'expiry', 'strike', 'date', 'px_last', 'px_volume']
+
+dtypes:
+raw_id               object
+figi                 object
+expiry       datetime64[ns]
+strike              float64
+date         datetime64[ns]
+px_last             float64
+px_volume             int64
+
+Date range      : 2022-08-12 → 2026-06-10
+Expiry range    : 2022-10-21 → 2027-01-15
+Unique contracts: 689
+Unique dates    : 958
+
+Sparsity
+  Possible (contract × date) cells : 660,062
+  Actual rows in parquet           : 46,867
+  Fill rate (rows / possible)      : 7.1%
+  px_last non-null rate            : 100.0%
+
+px_last statistics:
+count    46867.000000
+mean         3.102886
+std          3.559799
+min          0.010000
+25%          0.700000
+50%          2.000000
+75%          4.180000
+max         33.690000
+
+px_volume statistics:
+count    46867.000000
+mean       233.434207
+std        974.252257
+min          1.000000
+25%          8.000000
+50%         35.000000
+75%        146.000000
+max      65802.000000
+
+DTE statistics:
+count    46867.000000
+mean       142.492116
+std        160.912215
+min          0.000000
+25%         35.000000
+50%         91.000000
+75%        185.000000
+max        858.000000
+  DTE < 0 (post-expiry rows) : 0
+
+Contracts per trading day:
+  min=1  median=49  mean=48.9  max=118
+
+Strike statistics:
+count    46867.000000
+mean        17.585956
+std          6.327587
+min          5.000000
+25%         12.730000
+50%         16.700000
+75%         22.000000
+max         35.700000
+

@@ -1,0 +1,13 @@
+==============================================================================
+STRATEGY 1 -- DOUBLE-SHORT (naked short TSLL): RISK METRICS
+==============================================================================
+          Strategy    CAGR  Ann. Vol  Sharpe  Max DD  Calmar
+        Buy & Hold  0.1118    0.7089  0.4928 -0.8107  0.1379
+  Rebalanced Daily -0.6255    1.0705 -0.3442 -0.9951 -0.6286
+ Rebalanced Weekly -0.6245    1.1254 -0.2727 -0.9950 -0.6276
+Rebalanced Monthly -0.6697    2.4809  0.4275 -0.9982 -0.6709
+
+Buy & Hold: equity goes negative (margin wipeout) on 0 / 962 days (first on never)
+
+Figures saved to /Users/dakshkumar/NCSU/Summer Session 1 2026/FIM 675/dynamic_hedging_project/observations/strategies/double_short/
+Equity curve saved to /Users/dakshkumar/NCSU/Summer Session 1 2026/FIM 675/dynamic_hedging_project/results/double_short/equity.csv

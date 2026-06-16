@@ -132,6 +132,15 @@ def load_tsla_calls(use_cache: bool = True) -> pd.DataFrame:
     return long_df
 
 
+def load_tsll_calls() -> pd.DataFrame:
+    """Long-format TSLL call option closing prices.
+
+    Reads the pre-parsed cache at data/processed/TSLL_calls_close.parquet.
+    Columns: raw_id, figi, expiry, strike, date, px_last, px_volume
+    """
+    return pd.read_parquet(DATA_DIR / "processed" / "TSLL_calls_close.parquet")
+
+
 if __name__ == "__main__":
     tsla = load_tsla_underlying()
     tslt = load_tslt()
@@ -146,3 +155,6 @@ if __name__ == "__main__":
         print(f"{name:6s}: {len(df):,} rows  {df['Date'].min().date()} -> {df['Date'].max().date()}")
     print(f"CALLS: {len(calls):,} rows  {calls['raw_id'].nunique():,} contracts  "
           f"{calls['date'].min().date()} -> {calls['date'].max().date()}")
+    tsll_calls = load_tsll_calls()
+    print(f"TSLL_CALLS: {len(tsll_calls):,} rows  {tsll_calls['raw_id'].nunique():,} contracts  "
+          f"{tsll_calls['date'].min().date()} -> {tsll_calls['date'].max().date()}")

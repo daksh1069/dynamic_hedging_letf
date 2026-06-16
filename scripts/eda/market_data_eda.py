@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 
 from data_loader import load_tsla_underlying, load_tslt, load_tsll
+from capture import capture_stdout
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT_DIR = ROOT / "observations" / "eda"
@@ -193,4 +194,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    with capture_stdout(OUT_DIR / "market_data_eda.txt"):
+        main()

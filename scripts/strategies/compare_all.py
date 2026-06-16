@@ -23,8 +23,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts" / "eda"))
 sys.path.insert(0, str(ROOT / "scripts" / "backtest"))
 
+from capture import capture_stdout
 from metrics import summarize
 
 OUT_DIR = ROOT / "observations" / "strategies"
@@ -79,4 +81,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    with capture_stdout(OUT_DIR / "results.txt"):
+        main()
