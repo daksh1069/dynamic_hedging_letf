@@ -1,0 +1,5 @@
+Series,Ending NAV,Total Return,Max Drawdown
+PLTR,4.1840,324.37%,-40.61%
+Naive 2x Cumulative PLTR,7.3681,658.12%,-46.29%
+Theoretical Daily 2x LETF,8.6613,791.19%,-68.63%
+Actual PTIR,7.3015,648.22%,-70.20%
