@@ -136,6 +136,106 @@ def simulate(returns, calls, calls_spot, price_lookup, moneyness_bucket,
     return equity, stats
 
 
+def _position_cost(row, spot_val, sigma_val, leverage, cum_val, date):
+    """Delta-neutral cost (total premium $) for a candidate contract.  Returns
+    (cost, n, entry_price) or (inf, 0, 0) when row is None."""
+    if row is None:
+        return float("inf"), 0.0, 0.0
+    entry = float(row["px_last"])
+    T = max((row["expiry"] - date).days / 365.25, 1 / 365)
+    delta = bs_delta(float(spot_val), float(row["strike"]), T, R_RF, sigma_val)
+    n = leverage * cum_val / (max(delta, 0.01) * 100 * float(spot_val))
+    return n * 100 * entry, n, entry
+
+
+def simulate_ensemble(returns,
+                      tsla_calls, tsla_spot, tsla_lookup, tsla_sigma,
+                      tsll_calls, tsll_spot, tsll_lookup, tsll_sigma,
+                      moneyness_bucket):
+    """On each roll day price both a TSLA call and a TSLL call (same bucket).
+    Enter whichever provides delta-neutral coverage at lower total premium.
+    Fall back to the other if one underlying has no contract available.
+    """
+    cum_tsll = (1 + returns["TSLL"]).cumprod()
+    base_equity = 2.0 - cum_tsll
+    equity = pd.Series(index=returns.index, dtype=float)
+    position = None   # adds "underlying": "tsla"|"tsll" key vs regular simulate
+    option_pnl = 0.0
+    stats = {
+        "roll_attempts": 0, "fills": 0,
+        "fills_tsla": 0, "fills_tsll": 0,
+        "misses": 0, "miss_dates": [], "hedge_cost": 0.0,
+    }
+
+    def mtm(pos, date):
+        spot = tsla_spot if pos["underlying"] == "tsla" else tsll_spot
+        lkp  = tsla_lookup if pos["underlying"] == "tsla" else tsll_lookup
+        if date > pos["expiry"]:
+            return max(float(spot.loc[date]) - pos["strike"], 0.0)
+        px = lkp.get((pos["raw_id"], date))
+        if px is not None and not pd.isna(px):
+            return float(px)
+        return pos["price"]
+
+    for d in returns.index:
+        held_dte = (position["expiry"] - d).days if position is not None else -1
+        need_roll = (position is None) or (held_dte < ROLL_DTE)
+
+        if need_roll:
+            if position is not None:
+                option_pnl += position["n"] * 100 * (mtm(position, d) - position["price"])
+                position = None
+
+            stats["roll_attempts"] += 1
+            cum_val = float(cum_tsll.loc[d])
+            sig_a = float(tsla_sigma.loc[d]) if d in tsla_sigma.index else 0.5
+            sig_b = float(tsll_sigma.loc[d]) if d in tsll_sigma.index else 0.5
+
+            row_a = select_contract(tsla_calls, tsla_spot, d, moneyness_bucket,
+                                    TARGET_DTE, max_dte=MAX_DTE)
+            row_b = select_contract(tsll_calls, tsll_spot, d, moneyness_bucket,
+                                    TARGET_DTE, max_dte=MAX_DTE)
+
+            cost_a, n_a, entry_a = _position_cost(
+                row_a, tsla_spot.loc[d], sig_a, TSLL_LEVER, cum_val, d)
+            cost_b, n_b, entry_b = _position_cost(
+                row_b, tsll_spot.loc[d], sig_b, 1.0, cum_val, d)
+
+            # Pick cheaper; fall back to available if one is missing
+            if cost_a <= cost_b and row_a is not None:
+                chosen, row, n, entry, ul = "tsla", row_a, n_a, entry_a, "tsla"
+                stats["fills_tsla"] += 1
+            elif row_b is not None:
+                chosen, row, n, entry, ul = "tsll", row_b, n_b, entry_b, "tsll"
+                stats["fills_tsll"] += 1
+            elif row_a is not None:
+                chosen, row, n, entry, ul = "tsla", row_a, n_a, entry_a, "tsla"
+                stats["fills_tsla"] += 1
+            else:
+                chosen = None
+
+            if chosen is not None:
+                position = {
+                    "underlying": ul, "raw_id": row["raw_id"],
+                    "strike": float(row["strike"]), "expiry": row["expiry"],
+                    "n": n, "price": entry,
+                }
+                stats["fills"] += 1
+                stats["hedge_cost"] += n * 100 * entry
+            else:
+                stats["misses"] += 1
+                stats["miss_dates"].append(d)
+        else:
+            if position is not None:
+                px = mtm(position, d)
+                option_pnl += position["n"] * 100 * (px - position["price"])
+                position["price"] = px
+
+        equity.loc[d] = base_equity.loc[d] + option_pnl
+
+    return equity, stats
+
+
 def build_row(name, equity, stats, bench_cagr, n_years, show_fill):
     eq_ret = equity.pct_change().dropna()
     row = summarize(equity, eq_ret, name)
@@ -283,6 +383,21 @@ def main():
                               bench_cagr, n_years, show_fill=True))
         fill_stats_b[bucket] = stats_b
 
+    # ── Ensemble: cheapest-on-the-day (TSLA vs TSLL) ────────────────────
+    ens_stats = {}
+    for bucket in BUCKETS:
+        print(f"  Simulating Ensemble-{bucket} ...", flush=True)
+        eq_e, stats_e = simulate_ensemble(
+            returns,
+            tsla_calls, tsla_spot, tsla_lookup, tsla_sigma,
+            tsll_calls, tsll_spot, tsll_lookup, tsll_sigma,
+            bucket)
+        eq_e = eq_e / eq_e.iloc[0]
+        curves[f"Ens-{bucket}"] = eq_e
+        rows.append(build_row(f"Ens-{bucket}", eq_e, stats_e,
+                              bench_cagr, n_years, show_fill=True))
+        ens_stats[bucket] = stats_e
+
     print()
     metrics_df = pd.DataFrame(rows)
     print(metrics_df.to_string(index=False))
@@ -293,6 +408,13 @@ def main():
         rate = s["fills"] / s["roll_attempts"] * 100 if s["roll_attempts"] else 0
         print(f"  {bucket:>10s}: {s['fills']}/{s['roll_attempts']} fills "
               f"({rate:.1f}%)  |  {s['misses']} miss days")
+
+    print("\nEnsemble — pick selection:")
+    for bucket, s in ens_stats.items():
+        tot = s["fills_tsla"] + s["fills_tsll"]
+        print(f"  {bucket:>10s}: TSLA {s['fills_tsla']}/{tot} "
+              f"({s['fills_tsla']/tot*100:.0f}%)  TSLL {s['fills_tsll']}/{tot} "
+              f"({s['fills_tsll']/tot*100:.0f}%)  |  {s['misses']} miss days")
 
     # ── Figures & results ────────────────────────────────────────────────
     make_equity_figure(curves, OUT_DIR)

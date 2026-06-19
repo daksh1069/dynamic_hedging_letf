@@ -7,5 +7,17 @@ Dynamic Beta Hedge 0.1546    0.0544  2.6894 -0.1003  1.5413
 
 Dynamic hedge ratio h_t (rolling 63d beta, lagged 1d): mean=1.787  min=1.482  max=2.005
 
+──────────────────────────────────────────────────────────────────────────────
+BORROW-COST SENSITIVITY  (Dynamic Beta, gross notional ≈ 2.79x)
+──────────────────────────────────────────────────────────────────────────────
+     Strategy    CAGR  Ann. Vol  Sharpe  Max DD  Calmar  Annual Drag $
+ Borrow 0%/yr  0.1546    0.0544  2.6894 -0.1003  1.5413         0.0000
+ Borrow 3%/yr  0.0626    0.0544  1.1518 -0.1018  0.6147         0.0836
+ Borrow 6%/yr -0.0222    0.0544 -0.3864 -0.1279 -0.1733         0.1672
+Borrow 10%/yr -0.1248    0.0544 -2.4373 -0.3800 -0.3283         0.2787
+
+Note: excludes transaction costs (~0.05-0.10% per rebalance × 252 days)
+      and TSLA long financing cost (~5% on ~0.79x net long).
+
 Figures saved to /Users/dakshkumar/NCSU/Summer Session 1 2026/FIM 675/dynamic_hedging_project/observations/strategies/delta_arb/
 Equity curve saved to /Users/dakshkumar/NCSU/Summer Session 1 2026/FIM 675/dynamic_hedging_project/results/delta_arb/equity.csv

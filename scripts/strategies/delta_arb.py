@@ -89,6 +89,7 @@ def main():
         "Static 2x Hedge": equity_static,
     }
 
+    gross_notional = 1.0 + beta_v.mean()   # |TSLL| + |TSLA|
     print("=" * 78)
     print("STRATEGY 2 -- DELTA-ADJUSTED ARBITRAGE (long h*TSLA + short TSLL): RISK METRICS")
     print("=" * 78)
@@ -101,6 +102,24 @@ def main():
 
     print(f"\nDynamic hedge ratio h_t (rolling {ROLL_WINDOW}d beta, lagged 1d): "
           f"mean={beta_v.mean():.3f}  min={beta_v.min():.3f}  max={beta_v.max():.3f}")
+
+    # ── Borrow-cost sensitivity (Dynamic Beta only) ───────────────────────
+    # TSLL is often hard-to-borrow (HTB); cost charged on gross notional.
+    print(f"\n{'─'*78}")
+    print(f"BORROW-COST SENSITIVITY  (Dynamic Beta, gross notional ≈ {gross_notional:.2f}x)")
+    print(f"{'─'*78}")
+    borrow_rows = []
+    for rate in BORROW_RATES:
+        r_b, w_b = with_borrow_leg(returns_v, weights_dyn, rate)
+        eq_b = rebalanced_equity(r_b, w_b, freq="D")
+        eq_ret_b = eq_b.pct_change().dropna()
+        row = summarize(eq_b, eq_ret_b, f"Borrow {rate:.0%}/yr")
+        row["Annual Drag $"] = round(rate * gross_notional, 4)
+        borrow_rows.append(row)
+    borrow_df = pd.DataFrame(borrow_rows)
+    print(borrow_df.to_string(index=False, float_format=lambda x: f"{x:,.4f}"))
+    print("\nNote: excludes transaction costs (~0.05-0.10% per rebalance × 252 days)")
+    print("      and TSLA long financing cost (~5% on ~0.79x net long).")
 
     # ── Plots ────────────────────────────────────────────────────────────
     baseline = pd.read_csv(ROOT / "results" / "double_short" / "equity.csv",

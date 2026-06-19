@@ -1,7 +1,7 @@
 ==================================================================================
 COST-BENEFIT ANALYSIS: Short TSLL + Long Call Hedge  [DELTA-NEUTRAL SIZING]
 Window : 2022-08-12 → 2026-06-10  (3.8 years)
-Params : DTE 0–180d, roll @ 14d  |  Target DTE 60d  |  r=5%, vol window=21d
+Params : DTE 0–180d, roll @ 14d  |  Target DTE 180d  |  r=5%, vol window=21d
 Strategy A: n = (2×cum_tsll)/(Δ_tsla×100×tsla_spot)  [TSLL lever=2x vs TSLA]
 Strategy B: n = (1×cum_tsll)/(Δ_tsll×100×tsll_spot)  [direct TSLL delta hedge]
 ==================================================================================
@@ -11,20 +11,31 @@ Strategy B: n = (1×cum_tsll)/(Δ_tsll×100×tsll_spot)  [direct TSLL delta hedg
   Simulating B-10% OTM ...
   Simulating A-20% OTM ...
   Simulating B-20% OTM ...
+  Simulating Ensemble-ATM ...
+  Simulating Ensemble-10% OTM ...
+  Simulating Ensemble-20% OTM ...
 
- Strategy      CAGR  Ann. Vol    Sharpe    Max DD    Calmar Hedge Cost $ Hedge Eff. Fill Rate Miss Days
-Benchmark  0.133416  0.671640  0.496592 -0.796359  0.167533           --         --        --        --
-    A-ATM -0.098221  0.356188 -0.115296 -0.426660 -0.230209       5.6301     -0.157        --        --
-    B-ATM -0.060244  0.373704  0.020288 -0.494951 -0.121718       4.6035     -0.161     57.1%        21
-A-10% OTM -0.018737  0.365518  0.129486 -0.402117 -0.046595       4.9094     -0.119        --        --
-B-10% OTM  0.105835  0.292220  0.490356 -0.296371  0.357102        3.684     -0.029     63.4%        15
-A-20% OTM  0.039889  0.484958  0.322823 -0.457200  0.087246       5.2972     -0.068        --        --
-B-20% OTM  0.190270  0.326755  0.697406 -0.247867  0.767631       3.3991      0.064     42.4%        34
+   Strategy      CAGR  Ann. Vol    Sharpe    Max DD    Calmar Hedge Cost $ Hedge Eff. Fill Rate Miss Days
+  Benchmark  0.133416  0.671640  0.496592 -0.796359  0.167533           --         --        --        --
+      A-ATM  0.095920  0.293539  0.460640 -0.251795  0.380946       2.9906     -0.048        --        --
+      B-ATM  0.098830  0.379375  0.439630 -0.297900  0.331755       3.0032     -0.044     46.9%        17
+  A-10% OTM  0.053627  0.348992  0.323986 -0.362132  0.148088       2.9284     -0.104        --        --
+  B-10% OTM  0.140931  0.313211  0.578428 -0.324163  0.434754       2.5566      0.011     48.3%        15
+  A-20% OTM -0.226404  0.608396 -0.126050 -0.742461 -0.304937       3.3723     -0.408        --        --
+  B-20% OTM  0.109496  0.408704  0.460812 -0.352287  0.310815       2.4129     -0.038     29.5%        31
+    Ens-ATM  0.162861  0.355813  0.603190 -0.308499  0.527914       2.9217      0.039    100.0%         0
+Ens-10% OTM  0.183929  0.322242  0.686492 -0.235405  0.781332       2.5168      0.077    100.0%         0
+Ens-20% OTM  0.066908  0.427194  0.364788 -0.404482  0.165415       3.7036     -0.069     88.0%         3
 
 Strategy B — TSLL call fill detail:
-         ATM: 28/49 fills (57.1%)  |  21 miss days
-     10% OTM: 26/41 fills (63.4%)  |  15 miss days
-     20% OTM: 25/59 fills (42.4%)  |  34 miss days
+         ATM: 15/32 fills (46.9%)  |  17 miss days
+     10% OTM: 14/29 fills (48.3%)  |  15 miss days
+     20% OTM: 13/44 fills (29.5%)  |  31 miss days
+
+Ensemble — pick selection:
+         ATM: TSLA 2/14 (14%)  TSLL 12/14 (86%)  |  0 miss days
+     10% OTM: TSLA 2/14 (14%)  TSLL 12/14 (86%)  |  0 miss days
+     20% OTM: TSLA 12/22 (55%)  TSLL 10/22 (45%)  |  3 miss days
 
 Figures  → /Users/dakshkumar/NCSU/Summer Session 1 2026/FIM 675/dynamic_hedging_project/observations/strategies/cba/
 Equity CSVs → /Users/dakshkumar/NCSU/Summer Session 1 2026/FIM 675/dynamic_hedging_project/results/cba/
