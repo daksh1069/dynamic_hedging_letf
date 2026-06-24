@@ -33,6 +33,9 @@ def select_contract(calls_df: pd.DataFrame, spot: pd.Series, date: pd.Timestamp,
     load_tsll_calls() (columns: raw_id, expiry, strike, date, px_last, ...).
     `spot` is the underlying's close, indexed by date (TSLA for TSLA calls,
     TSLL for TSLL calls). `max_dte` optionally caps the DTE filter.
+
+    Requires px_volume > 0 on top of a valid px_last -- a quote with no
+    trading volume that day isn't a real fill, just a carried/stale price.
     Returns the selected row (pd.Series), or None if no contract qualifies.
     """
     lo, hi = MONEYNESS_RANGES[moneyness_bucket]
@@ -47,6 +50,7 @@ def select_contract(calls_df: pd.DataFrame, spot: pd.Series, date: pd.Timestamp,
         (moneyness >= lo) & (moneyness < hi)
         & (dte > 0)
         & day["px_last"].notna() & (day["px_last"] > 0)
+        & day["px_volume"].notna() & (day["px_volume"] > 0)
     )
     if max_dte is not None:
         mask = mask & (dte <= max_dte)

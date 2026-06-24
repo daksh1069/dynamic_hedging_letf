@@ -13,3 +13,7 @@ databento==0.64.0
 ## Options pricing / Greeks (for the upcoming backtest)
 scipy==1.13.1
 py-vollib==1.0.12
+
+## Notebook sandboxes (scripts/utils/*.ipynb)
+jupyter==1.1.1
+ipykernel==6.31.0

@@ -16,8 +16,17 @@ BORROW-COST SENSITIVITY  (Dynamic Beta, gross notional ≈ 2.79x)
  Borrow 6%/yr -0.0222    0.0544 -0.3864 -0.1279 -0.1733         0.1672
 Borrow 10%/yr -0.1248    0.0544 -2.4373 -0.3800 -0.3283         0.2787
 
-Note: excludes transaction costs (~0.05-0.10% per rebalance × 252 days)
-      and TSLA long financing cost (~5% on ~0.79x net long).
+Note: excludes transaction costs (~0.05-0.10% per rebalance × 252 days).
+
+──────────────────────────────────────────────────────────────────────────────
+BORROW-COST: REAL TSLL BORROW-FEE SERIES + ASSUMED TSLA MARGIN RATE
+(TSLL series is approximate -- read off public borrow-fee charts at quarterly
+ granularity, see scripts/backtest/borrow_rates.py. TSLA leg uses a flat
+ assumed margin-loan rate (6.5%/yr) since that's financing a LONG
+ position, not a short-borrow fee -- TSLA's real borrow-fee chart doesn't apply here.)
+──────────────────────────────────────────────────────────────────────────────
+                      Strategy    CAGR  Ann. Vol  Sharpe  Max DD  Calmar  Avg TSLL Rate  TSLA Margin Rate
+Real TSLL Borrow + TSLA Margin -0.0086    0.0544 -0.1301 -0.1030 -0.0832         0.0372            0.0650
 
 Figures saved to /Users/dakshkumar/NCSU/Summer Session 1 2026/FIM 675/dynamic_hedging_project/observations/strategies/delta_arb/
 Equity curve saved to /Users/dakshkumar/NCSU/Summer Session 1 2026/FIM 675/dynamic_hedging_project/results/delta_arb/equity.csv

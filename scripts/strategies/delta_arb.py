@@ -15,6 +15,11 @@ short TSLL is offset by the long TSLA leg).
     |TSLA|, ~2.8x), at a few annual rates -- this strategy's edge depends on
     being able to rebalance ~2.8x gross notional daily for free, which is
     optimistic (TSLL is often hard-to-borrow).
+  - Real-data estimate: same idea, but using the actual TSLL borrow-fee
+    series (scripts/backtest/borrow_rates.py, read off public charts) for
+    the short TSLL leg, plus a separate flat assumed margin-loan rate for
+    the long TSLA leg -- these are two different costs (short-borrow fee vs.
+    margin interest on a long position), not one blended sensitivity rate.
 
 Risk metrics are printed to the console; figures saved to
 observations/strategies/delta_arb/. The dynamic-hedge equity curve is saved
@@ -36,6 +41,7 @@ from capture import capture_stdout
 from data_loader import load_tsla_underlying, load_tsll
 from engine import rebalanced_equity
 from metrics import summarize
+from borrow_rates import load_borrow_rates
 
 OUT_DIR = ROOT / "observations" / "strategies" / "delta_arb"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -43,7 +49,9 @@ RESULTS_DIR = ROOT / "results" / "delta_arb"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 ROLL_WINDOW = 63
-BORROW_RATES = [0.00, 0.03, 0.06, 0.10]  # annualized, on gross notional
+BORROW_RATES = [0.00, 0.03, 0.06, 0.10]  # annualized, on gross notional -- assumed sensitivity bounds
+TSLA_MARGIN_RATE = 0.065  # flat assumed margin-loan rate for the LONG TSLA leg (not a borrow fee --
+                          # TSLA's real "cost to borrow" chart data is for shorting, irrelevant here)
 
 
 def with_borrow_leg(returns_v: pd.DataFrame, weights, borrow_rate: float):
@@ -58,6 +66,29 @@ def with_borrow_leg(returns_v: pd.DataFrame, weights, borrow_rate: float):
     else:
         w = weights.copy()
         w["Borrow"] = -(w["TSLL"].abs() + w["TSLA"].abs())
+    return r, w
+
+
+def with_real_borrow_leg(returns_v: pd.DataFrame, weights, tsll_borrow_series: pd.Series,
+                         tsla_margin_rate: float):
+    """Like with_borrow_leg, but split into the two costs that actually apply:
+    the real day-varying TSLL borrow-fee series (borrow_rates.py) on the
+    short TSLL leg, and a separate flat assumed margin-loan rate on the long
+    TSLA leg. These are economically different (short-borrow fee vs. margin
+    interest on a long position) and shouldn't share one blended rate.
+    """
+    r = returns_v.copy()
+    tsll_rate = tsll_borrow_series.reindex(r.index).ffill().bfill()
+    r["BorrowTSLL"] = tsll_rate / 252
+    r["MarginTSLA"] = tsla_margin_rate / 252
+    if isinstance(weights, dict):
+        w = dict(weights)
+        w["BorrowTSLL"] = -abs(weights.get("TSLL", 0.0))
+        w["MarginTSLA"] = -abs(weights.get("TSLA", 0.0))
+    else:
+        w = weights.copy()
+        w["BorrowTSLL"] = -w["TSLL"].abs()
+        w["MarginTSLA"] = -w["TSLA"].abs()
     return r, w
 
 
@@ -118,8 +149,25 @@ def main():
         borrow_rows.append(row)
     borrow_df = pd.DataFrame(borrow_rows)
     print(borrow_df.to_string(index=False, float_format=lambda x: f"{x:,.4f}"))
-    print("\nNote: excludes transaction costs (~0.05-0.10% per rebalance × 252 days)")
-    print("      and TSLA long financing cost (~5% on ~0.79x net long).")
+    print("\nNote: excludes transaction costs (~0.05-0.10% per rebalance × 252 days).")
+
+    # ── Borrow cost: real TSLL series + assumed TSLA margin rate ──────────
+    print(f"\n{'─'*78}")
+    print("BORROW-COST: REAL TSLL BORROW-FEE SERIES + ASSUMED TSLA MARGIN RATE")
+    print("(TSLL series is approximate -- read off public borrow-fee charts at quarterly")
+    print(" granularity, see scripts/backtest/borrow_rates.py. TSLA leg uses a flat")
+    print(f" assumed margin-loan rate ({TSLA_MARGIN_RATE:.1%}/yr) since that's financing a LONG")
+    print(" position, not a short-borrow fee -- TSLA's real borrow-fee chart doesn't apply here.)")
+    print(f"{'─'*78}")
+    tsll_borrow_series = load_borrow_rates(returns_v.index)["TSLL"]
+    r_real, w_real = with_real_borrow_leg(returns_v, weights_dyn, tsll_borrow_series, TSLA_MARGIN_RATE)
+    eq_real = rebalanced_equity(r_real, w_real, freq="D")
+    eq_ret_real = eq_real.pct_change().dropna()
+    row_real = summarize(eq_real, eq_ret_real, "Real TSLL Borrow + TSLA Margin")
+    row_real["Avg TSLL Rate"] = round(float(tsll_borrow_series.mean()), 4)
+    row_real["TSLA Margin Rate"] = TSLA_MARGIN_RATE
+    real_df = pd.DataFrame([row_real])
+    print(real_df.to_string(index=False, float_format=lambda x: f"{x:,.4f}"))
 
     # ── Plots ────────────────────────────────────────────────────────────
     baseline = pd.read_csv(ROOT / "results" / "double_short" / "equity.csv",
