@@ -6,3 +6,4 @@ __pycache__/
 .claude/
 latex/
 .ipynb_checkpoints/
+scripts/utils/sandbox/prod_experiments/
