@@ -1,120 +1,117 @@
-# Still a WIP
+# Dynamic Hedging of a Leveraged ETF Position: TSLA / TSLL
 
-# Dynamic Hedging of a Leveraged ETF Position — TSLA / TSLL
-
-This repo contains the data-acquisition pipeline and source data for the
-**TSLA / TSLL** workstream of a larger team project on hedging leveraged ETF (LETF)
-positions.
+This repository holds the data-acquisition pipeline, source data, and strategy research
+for the **TSLA / TSLL** workstream of a larger team project on hedging leveraged ETF
+(LETF) positions. The final deliverable is a guaranteed-floor convexity protection
+engine whose maximum drawdown is capped by a closed-form bound; see
+[Section 8](#8-guaranteed-floor-engine-final-result).
 
 ## 1. Project Context
 
-**Project**: "Optimal Hedging Strategy of a Leveraged ETF Position" — a team project.
+**Project**: "Optimal Hedging Strategy of a Leveraged ETF Position", a team project.
 
 **Strategy direction** (decided in the team's 2026-06-04 meeting): **Convexity
-Protection** — short the leveraged ETF (LETF) and hold a long call option on either the
-LETF or its underlying. LETFs suffer from volatility decay over time, so pairing a short
-LETF position with a long call aims to cap downside while retaining convexity. Open
-questions the team is testing: calls on the LETF vs. calls on the underlying, maturity
-choice, ATM vs. OTM strikes, and the resulting hedge cost vs. risk reduction. Puts are
-not needed (a short-LETF position is already short delta).
+Protection**, meaning short the leveraged ETF (LETF) and hold a long call option on
+either the LETF or its underlying. LETFs suffer from volatility decay over time, so
+pairing a short LETF position with a long call aims to cap downside while retaining
+convexity. The final engine (Section 8) extends this with a short out-of-the-money put
+leg, a collar, which lowers the net cost of the floor by selling rich crash insurance.
 
-**Team tickers**: each member owns one underlying/LETF pair —
-MSTR/MSTU, SMCI/SMCX, TSLA/TSLT (note: this repo's pipeline targets **TSLL**, see
+**Team tickers**: each member owns one underlying/LETF pair:
+MSTR/MSTU, SMCI/SMCX, TSLA/TSLT (note: this repository's pipeline targets **TSLL**, see
 below), COIN/CONL, PLTR/PLTU, MU/MUU, ETH/ETHT, NG1/BOIL, SOXX/SOXL, AVGO/AVL, NVO/NVOX,
-NVDA/NVDL, MSOS/MSOX. **This repo covers TSLA / TSLL** (Tesla / Direxion Daily TSLA Bull
-2X), owned by **Daksh Kumar**, paired with teammate Shubham Balodi. Other tickers are
-teammates' own work and out of scope here.
+NVDA/NVDL, MSOS/MSOX. **This repository covers TSLA / TSLL** (Tesla / Direxion Daily TSLA
+Bull 2X), owned by **Daksh Kumar**, paired with teammate Shubham Balodi. Other tickers
+are teammates' own work and out of scope here.
 
-**Data scope** (decided 2026-06-10): only **`PX_LAST`** (closing price)
-is needed for the options — no bid-ask, Greeks, IV, or intraday data. Contract term
-should be **< ~1 quarter (~<90 DTE)**, applied as a filter at backtest time. End-of-day
+**Data scope** (decided 2026-06-10, since extended): only **`PX_LAST`** (closing price)
+and `PX_VOLUME` are pulled for options. No bid-ask, Greeks, IV, or intraday data. The
+scope was initially call-only; it was later extended to **put chains** (for the collar
+leg) and to an approximate **short-borrow-fee** series (for realized returns). End-of-day
 data is sufficient throughout.
 
 ## 2. Overview
 
-The pipeline answers one question: *for every TSLA call option that's a plausible
-hedge candidate (2020–2026, 15–180 DTE, 80%–130% moneyness at some point in its life),
-what was its daily closing price and volume — at $0 cost?*
+The pipeline answers one question: *for every TSLA and TSLL option (call or put) that is
+a plausible hedge candidate (2020-2026, 15-180 DTE, 80%-130% moneyness at some point in
+its life), what was its daily closing price and volume, at zero data cost?*
 
-It starts from team-wide Bloomberg exports in `data/`, narrows down to TSLA's ~3,800
-relevant call contracts, decodes their Bloomberg IDs via OpenFIGI, pulls daily
-`PX_LAST`/`PX_VOLUME` history via a Bloomberg Terminal BDH workbook, and combines that
-with TSLA spot and TSLL OHLCV pulled for free via `yfinance`. The result is three clean
-Parquet/CSV datasets (see [Data Schema](#6-data-schema)), ready for backtesting the
-convexity-protection strategy.
+It starts from team-wide Bloomberg exports in `data/`, narrows down to the relevant
+contracts, decodes their Bloomberg IDs via OpenFIGI, pulls daily `PX_LAST`/`PX_VOLUME`
+history via a Bloomberg Terminal BDH workbook, and combines that with TSLA spot and TSLL
+OHLCV pulled for free via `yfinance`. The result is clean Parquet/CSV datasets (see
+[Data Schema](#7-data-schema)), ready for backtesting.
+
+On top of that data, `scripts/` implements the exploratory Cost-Benefit Analysis
+(Section 8) and the final guaranteed-floor engine.
 
 ## 3. Repository Structure
 
 ```
 dynamic_hedging_project/
-├── README.md
-├── requirements.txt           # pip dependencies
-├── .env                        # API keys (gitignored, not committed)
-├── .gitignore
-├── venv/                        # Python 3.9 virtualenv (gitignored)
-│
-├── excel_formula/                # Bloomberg formula templates + the numbered pipeline that
-│   ├── Excel1_Benchmarks.xlsx     # (re)produces data/*.xlsx. EDA and the backtest read
-│   ├── Excel2_LETF_Data.xlsx      # directly from data/ -- this pipeline is for
-│   ├── Excel3_Underlying_Data.xlsx# regenerating/extending the raw inputs (e.g. new tickers).
-│   ├── Excel5_OptionTickers_Final.xlsx
-│   └── scripts/                   # numbered pipeline, 00a-00b + 01-03 + 05-09 (see Section 5)
-│       ├── 00a_build_excel5.py
-│       ├── 00b_build_excel3.py
-│       ├── 01_process_excel5.py
-│       ├── 02_decode_openfigi.py
-│       ├── 03_filter_contracts.py
-│       ├── 05_prep_ticker_bdh_full.py
-│       ├── 06_check_bdh_full.py
-│       ├── 07_parse_bdh_full.py
-│       ├── 08_fetch_ticker_spot_yfinance.py
-│       └── 09_fetch_ticker_ohlcv_yfinance.py
-│
-├── data/                          # ── raw inputs, read directly by scripts/ ──
-│   ├── Excel5_OptionTickers_Final.xlsx   # raw: quarterly OPT_CHAIN BBG IDs, 2020-2026
-│   ├── Excel2_LETF_Data.xlsx             # raw: per-LETF BDP + BDH (13 LETFs incl. TSLT)
-│   ├── Excel3_Underlying_Data.xlsx       # raw: per-underlying BDP + BDH (13 names, incl. TSLA)
-│   ├── Benchmarks.xlsx                   # raw: SPY / QQQ / VIX / 3M T-bill BDH
-│   ├── TSLL_ohlcv.xlsx                   # raw: TSLL OHLCV via yfinance (excel_formula/scripts/09 TSLL)
-│   ├── TSLA_calls_PXLAST_full_filled.xlsx# raw: TSLA call-option universe (3,797 contracts)
-│   └── processed/                        # cached/parsed datasets, regenerated automatically
-│       └── TSLA_calls_close.parquet      #   by scripts/eda/data_loader.py on first run
-│
-├── scripts/                       # ── all analysis code ──
-│   └── eda/
-│       ├── data_loader.py             # shared loaders for the raw Excel files in data/
-│       └── market_data_eda.py         # TSLA/TSLT/TSLL stats, tracking, decay, drawdown
-│
-├── observations/                  # ── figures/plots saved by scripts/ ──
-│   └── eda/
-│       ├── rolling_realized_leverage.png
-│       ├── decay_actual_vs_naive2x.png
-│       ├── short_letf_drawdown.png
-│       └── rebased_prices_since_tslt_inception.png
-│
-└── results/                        # ── final backtest results (TBD) ──
+|-- README.md
+|-- requirements.txt            # pip dependencies
+|-- .env                         # API keys (gitignored, not committed)
+|-- .gitignore
+|-- venv/                        # Python 3.9 virtualenv (gitignored)
+|
+|-- excel_formula/                # Bloomberg formula templates + the numbered pipeline that
+|   |-- Excel1_Benchmarks.xlsx     # (re)produces data/*.xlsx. EDA and backtests read
+|   |-- Excel2_LETF_Data.xlsx      # directly from data/. This pipeline is for
+|   |-- Excel3_Underlying_Data.xlsx# regenerating/extending the raw inputs (e.g. puts, new tickers).
+|   |-- Excel5_OptionTickers_Final.xlsx
+|   +-- scripts/                   # numbered pipeline, 00a-00b + 01-03 + 05-09 (see Section 6)
+|       +-- 00a..09_*.py           #   OPTION_TYPE env var switches every step between calls and puts
+|
+|-- data/                          # -- raw inputs, read directly by scripts/ --
+|   |-- Excel5_OptionTickers_Final.xlsx   # raw: quarterly OPT_CHAIN BBG IDs, 2020-2026
+|   |-- Excel2_LETF_Data.xlsx             # raw: per-LETF BDP + BDH (13 LETFs incl. TSLT)
+|   |-- Excel3_Underlying_Data.xlsx       # raw: per-underlying BDP + BDH (13 names, incl. TSLA)
+|   |-- Benchmarks.xlsx                   # raw: SPY / QQQ / VIX / 3M T-bill BDH
+|   |-- TSLL_ohlcv.xlsx                   # raw: TSLL OHLCV via yfinance
+|   |-- TSLA_calls_PXLAST_full_filled.xlsx# raw: TSLA call universe (filled BDH)
+|   |-- TSLA_puts_PXLAST_full_filled.xlsx # raw: TSLA put universe (filled BDH)
+|   |-- TSLL_puts_PXLAST_full_filled.xlsx # raw: TSLL put universe (filled BDH)
+|   +-- processed/                        # cached/parsed datasets
+|       |-- TSLA_calls_close.parquet
+|       |-- TSLL_calls_close.parquet
+|       |-- TSLA_puts_close.parquet
+|       +-- TSLL_puts_close.parquet
+|
+|-- scripts/                       # -- all analysis code --
+|   |-- eda/
+|   |   |-- data_loader.py             # shared loaders (calls, puts, spot, OHLCV, benchmarks)
+|   |   +-- market_data_eda.py         # TSLA/TSLT/TSLL stats, tracking, decay, drawdown
+|   |-- backtest/
+|   |   |-- cba_backtest.py            # Cost-Benefit Analysis engine
+|   |   |-- options_selection.py       # contract picker (moneyness bucket + DTE)
+|   |   |-- borrow_rates.py            # approximate TSLA/TSLL borrow-fee series
+|   |   +-- engine.py, metrics.py, grid_search.py
+|   |-- strategies/                    # naked short, delta-arb, convexity, double-short
+|   +-- utils/                         # research notebooks (see Section 8)
+|       |-- final_guaranteed_floor_project.ipynb   # <-- consolidated final result
+|       |-- continuous_capital_recycling_sandbox.ipynb
+|       |-- put_financed_floor_sandbox.ipynb
+|       +-- (earlier floor sandboxes)
+|
+|-- observations/                  # -- figures/plots saved by scripts/ --
+|   |-- eda/
+|   +-- strategies/{cba, final, sandbox, ...}
+|
+|-- results/                        # -- backtest output CSVs --
++-- latex/                          # -- project report --
+    |-- main.tex                       # (maintained on Overleaf; build artifacts in repo)
+    +-- guaranteed_floor_addendum.tex  # addendum: the guaranteed-floor engine (Section 8)
 ```
-
-> **Current state**: `data/` holds the raw/source files listed above (plus
-> `TSLL_ohlcv.xlsx`, fetched via `excel_formula/scripts/09_fetch_ticker_ohlcv_yfinance.py TSLL`). `Excel5b_UniqueTickers_ForDecode.xlsx`,
-> `decoded/`, `filtered/`, and `TSLA_calls_PXLAST_full.xlsx` are intermediate pipeline
-> artifacts that are **not needed going forward** — EDA and the backtest read directly
-> from the raw `data/*.xlsx` files (see `scripts/eda/`). Older intermediate
-> artifacts/side-tracks (Databento pull, OpenFIGI decode cache, etc.) were archived to a
-> backup folder outside this repo.
 
 ### Conventions for `scripts/`, `observations/`, and `results/`
 
-- **`scripts/<topic>/`** — analysis code, organized by topic (e.g. `scripts/eda/`).
-  Exploratory scripts are *not* numbered (numbering is reserved for the legacy ordered
-  pipeline in `excel_formula/scripts/`).
-- **`observations/<topic>/`** — figures/plots saved by the corresponding
-  `scripts/<topic>/` script. Summary statistics and tables are printed to the console,
-  not written to files.
-- **`results/`** — final backtest outputs.
-
-To run an EDA script: `venv/bin/python3 scripts/eda/market_data_eda.py` (run from the
-project root; each script resolves paths relative to its own location).
+- **`scripts/<topic>/`**: analysis code, organized by topic (`eda`, `backtest`,
+  `strategies`, `utils`). Numbering is reserved for the legacy ordered pipeline in
+  `excel_formula/scripts/`.
+- **`observations/<topic>/`**: figures/plots saved by the corresponding code. Summary
+  tables are printed to the console.
+- **`results/`**: final backtest output CSVs.
 
 ## 4. Setup
 
@@ -132,209 +129,171 @@ pip install -r requirements.txt
 Create a `.env` file in the project root (already gitignored):
 
 ```bash
-DATABENTO_API_KEY=your-key-here     # only needed to re-run the (archived) Databento side-track
-OPENFIGI_API_KEY=your-key-here      # needed for 02_decode_openfigi.py -- the decode
-                                     # cache (_checkpoint.json) is not in this repo, so
-                                     # a fresh run makes ~1,462 API requests (~6 min)
+OPENFIGI_API_KEY=your-key-here      # needed for 02_decode_openfigi.py
 ```
 
 Scripts load it via `load_dotenv(dotenv_path=ROOT/".env")`.
 
 ### Bloomberg Terminal access
 
-Steps 05–07 (BDH pull), and the `excel_formula/Excel1/2/3_*.xlsx` / `Excel5_OptionTickers_Final.xlsx`
-formula templates require a live **Bloomberg Terminal** connection (Excel BDP/BDH/BDS
-add-in) to refresh `=BDP(...)`/`=BDH(...)`/`=BDS(...)` formulas. Step 02 (OpenFIGI decode)
-needs `OPENFIGI_API_KEY` but otherwise runs unattended. Steps 00a, 00b, 01, 03, 08, 09 run
-fully unattended (no Terminal/API needed) -- they only *build* the formula templates;
-a Terminal is needed afterward to refresh and paste-as-values.
+Steps 05-07 (BDH pull) and the `excel_formula/Excel*.xlsx` formula templates require a
+live **Bloomberg Terminal** connection (Excel BDP/BDH/BDS add-in) to refresh the
+formulas. Step 02 (OpenFIGI decode) needs `OPENFIGI_API_KEY` but otherwise runs
+unattended. Steps 00a, 00b, 01, 03, 08, 09 run fully unattended; they only *build* the
+formula templates, and a Terminal is needed afterward to refresh and paste-as-values.
 
-## 5. Data Pipeline
+## 5. Running the Analysis
+
+All notebooks and scripts run from the project root using the venv interpreter.
+
+```bash
+# EDA
+venv/bin/python3 scripts/eda/market_data_eda.py
+
+# The final guaranteed-floor engine (consolidated, self-contained):
+venv/bin/jupyter nbconvert --to notebook --execute --inplace \
+  scripts/utils/final_guaranteed_floor_project.ipynb
+```
+
+## 6. Data Pipeline
 
 The pipeline in `excel_formula/scripts/` is numbered `00a`-`00b`, `01`-`03`, `05`-`09`
-(no `04`) and reads/writes files under `data/` and `excel_formula/`. Steps 00a, 00b, 01,
-03, 08, 09 run unattended; step 02 needs `OPENFIGI_API_KEY` (set in `.env`) but otherwise
-runs unattended; steps 05–07 require one manual Bloomberg Terminal round-trip (refresh
-the generated workbook, then "Paste Special → Values"). Steps 05, 06, 07, 08, 09 take
-the underlying's ticker as a required command-line argument, e.g.
-`python excel_formula/scripts/08_fetch_ticker_spot_yfinance.py TSLA`
-(no default — the script exits with a usage message if omitted).
+(no `04`) and reads/writes files under `data/` and `excel_formula/`. It was originally
+built for calls; every step now honors an **`OPTION_TYPE`** environment variable
+(`C` for calls, the default, or `P` for puts), so the identical pipeline produces the put
+datasets by re-running with `OPTION_TYPE=P`. Steps 05, 06, 07, 08, 09 also take the
+underlying's ticker as a required command-line argument.
 
-| # | Script | Input | Output | Notes |
-|---|--------|-------|--------|-------|
-| 00a | `00a_build_excel5.py` | — | `excel_formula/Excel5_OptionTickers_Final.xlsx` | Generates the quarterly OPT_CHAIN `=BDS()` formula template (13 underlyings x 26 quarters, Q1 2020 → Q2 2026). Refresh on Bloomberg Terminal, paste-as-values, save as `data/Excel5_OptionTickers_Final.xlsx` → input to step 01. |
-| 00b | `00b_build_excel3.py` | — | `excel_formula/Excel3_Underlying_Data.xlsx` | Generates the per-underlying daily OHLCV + Total Return + Market Cap `=BDH()` formula template (13 underlyings, 06/01/2020 → today). Refresh on Bloomberg Terminal, paste-as-values, save as `data/Excel3_Underlying_Data.xlsx` → used by step 03 for moneyness filtering. |
-| 01 | `01_process_excel5.py` | `data/Excel5_OptionTickers_Final.xlsx` | `excel_formula/Excel5b_UniqueTickers_ForDecode.xlsx` | Dedupe every unique call-option BBG ID per underlying (146,157 total across all 11 tickers; XETH/NG1 = 0). Local, free. Output currently kept in `excel_formula/`, not yet moved to `data/`. |
-| 02 | `02_decode_openfigi.py` | `data/Excel5b_UniqueTickers_ForDecode.xlsx` | `data/decoded/*_decoded.xlsx` | Decode BBG IDs → FIGI/expiry/strike/type via the OpenFIGI API (key loaded from `.env`). Resumable via `decoded/_checkpoint.json`. **Note**: copy/move step 01's output into `data/` before running this step. |
-| 03 | `03_filter_contracts.py` | `data/decoded/*_decoded.xlsx` | `data/filtered/*_calls_filtered.xlsx` | Filter to calls only, expiry 2020-2026, 15-180 DTE, 80%-130% moneyness at some point in life (uses `data/Excel3_Underlying_Data.xlsx`, generated by step 00b). TSLA: 31,034 → 3,797 contracts. |
-| 05 | `05_prep_ticker_bdh_full.py TICKER` | `data/filtered/<TICKER>_calls_filtered.xlsx` | `excel_formula/<TICKER>_calls_PXLAST_full.xlsx` | Generates a batched BDH workbook (one `=BDH()` block per security) for `PX_LAST`/`PX_VOLUME`. **Manual step**: refresh on Bloomberg Terminal, paste-as-values batch by batch → `data/<TICKER>_calls_PXLAST_full_filled.xlsx`. |
-| 06 | `06_check_bdh_full.py TICKER` | `data/<TICKER>_calls_PXLAST_full_filled.xlsx` | console report | Sanity-checks every batch/block for errors, row counts, and date coverage. |
-| 07 | `07_parse_bdh_full.py TICKER` | `data/<TICKER>_calls_PXLAST_full_filled.xlsx` | `data/processed/<TICKER>_calls_close.parquet` | Parses the filled BDH workbook into a clean long-format table. |
-| 08 | `08_fetch_ticker_spot_yfinance.py TICKER` | — (yfinance) | `data/processed/<TICKER>_spot_ohlcv.{parquet,csv}` | Split-adjusted spot OHLCV for the underlying, free, used for moneyness classification. |
-| 09 | `09_fetch_ticker_ohlcv_yfinance.py TICKER` | — (yfinance) | `data/<TICKER>_ohlcv.xlsx` | Daily OHLCV history for any ticker (e.g. the LETF), free. |
+| # | Script | Output | Notes |
+|---|--------|--------|-------|
+| 00a | `00a_build_excel5.py` | `Excel5_OptionTickers_Final.xlsx` | Quarterly OPT_CHAIN `=BDS()` template; `CHAIN_PUT_CALL_TYPE_OVRD` follows `OPTION_TYPE`. |
+| 00b | `00b_build_excel3.py` | `Excel3_Underlying_Data.xlsx` | Per-underlying daily OHLCV + TRI `=BDH()` template, used by step 03 for moneyness. |
+| 01 | `01_process_excel5.py` | `Excel5b_UniqueTickers_ForDecode.xlsx` | Dedupe every unique option BBG ID per underlying. |
+| 02 | `02_decode_openfigi.py` | `data/decoded/*_decoded.xlsx` | Decode BBG IDs to FIGI/expiry/strike/type via OpenFIGI. Resumable. |
+| 03 | `03_filter_contracts.py` | `data/filtered/*_{calls,puts}_filtered.xlsx` | Filter to `OPTION_TYPE`, expiry 2020-2026, 15-180 DTE, 80%-130% moneyness at some point in life. |
+| 05 | `05_prep_ticker_bdh_full.py TICKER` | `excel_formula/<TICKER>_..._PXLAST_full.xlsx` | Batched BDH workbook for `PX_LAST`/`PX_VOLUME`. Manual Terminal round-trip, then paste-as-values into `data/`. |
+| 06 | `06_check_bdh_full.py TICKER` | console report | Sanity-checks batches for errors, row counts, coverage. |
+| 07 | `07_parse_bdh_full.py TICKER` | `data/processed/<TICKER>_{calls,puts}_close.parquet` | Parses the filled workbook into a clean long table. |
+| 08 | `08_fetch_ticker_spot_yfinance.py TICKER` | `data/processed/<TICKER>_spot_ohlcv.*` | Split-adjusted spot OHLCV, free. |
+| 09 | `09_fetch_ticker_ohlcv_yfinance.py TICKER` | `data/<TICKER>_ohlcv.xlsx` | Daily OHLCV for any ticker (e.g. the LETF), free. |
 
-### Standalone Bloomberg formula templates
+`Excel1_Benchmarks.xlsx` and `Excel2_LETF_Data.xlsx` are self-sufficient Bloomberg
+formula workbooks kept for reference. `Excel3_Underlying_Data.xlsx` is wired in
+(generated by step 00b, consumed by step 03).
 
-`excel_formula/Excel1_Benchmarks.xlsx` and `Excel2_LETF_Data.xlsx` are self-sufficient
-Bloomberg formula workbooks (BDP/BDH) that, when refreshed on a Terminal and
-pasted-as-values, would (re)produce the raw `data/Benchmarks.xlsx` and
-`Excel2_LETF_Data.xlsx`. They are not wired into the numbered pipeline above — kept
-as-is for reference/regeneration. `Excel3_Underlying_Data.xlsx` **is** wired in: it's
-(re)generated by step 00b and consumed by step 03 (see table above).
-
-## 6. Data Schema
+## 7. Data Schema
 
 All files live in `data/` (raw inputs) or `data/processed/` (parsed/cached outputs).
-Loader functions are in `scripts/eda/data_loader.py`.
+Loader functions are in `scripts/eda/data_loader.py`. Every option parquet shares the
+same seven-column long format: `raw_id`, `figi`, `expiry`, `strike`, `date`, `px_last`,
+`px_volume`.
 
----
+### Processed option datasets (`data/processed/`)
 
-### Processed datasets (`data/processed/`)
+| Dataset | Rows | Contracts | Date range | Loader |
+|---|---|---|---|---|
+| `TSLA_calls_close.parquet` | 532,258 | 3,786 | 2020-01-02 to 2026-06-10 | `load_tsla_calls()` |
+| `TSLL_calls_close.parquet` | 46,867 | 689 | 2022-08-12 to 2026-06-10 | `load_tsll_calls()` |
+| `TSLA_puts_close.parquet` | 442,076 | 3,786 | 2020-01-02 to 2026-06-10 | `load_tsla_puts()` |
+| `TSLL_puts_close.parquet` | 55,978 | 1,348 | 2022-08-10 to 2026-06-10 | `load_tsll_puts()` |
 
-#### `TSLA_calls_close.parquet`
+TSLL chains are significantly sparser than TSLA (median around 49 contracts per day),
+which is the binding liquidity constraint on the LETF-native strategies. TSLL put
+liquidity is nonetheless sufficient for the collar: on 93% of days with a qualifying call
+anchor, a same-expiry 10%-30% out-of-the-money put also trades, at a median premium near
+10% of spot.
 
-532,258 rows × 7 columns — daily closing price/volume for 3,786 of the 3,797 filtered
-TSLA call contracts (the remaining 11, all 2020 expiries, returned no Bloomberg
-history and were dropped). Date range 2020-01-02 → 2026-06-10; expiries span
-2020-01-17 → 2026-12-18. Contracts per day: median 373, max 601.
-Loaded by: `load_tsla_calls()`.
+### Raw OHLCV and reference files (`data/`)
 
-| Column | Type | Description |
-|---|---|---|
-| `raw_id` | string | Bloomberg security ID + market sector, e.g. `"BBG00J7GWRB8 Equity"` |
-| `figi` | string | FIGI (same as `raw_id` without the `" Equity"` suffix) |
-| `expiry` | datetime64 | Option expiration date |
-| `strike` | float64 | Strike price (split-adjusted; range $48–$595) |
-| `date` | datetime64 | Trading date |
-| `px_last` | float64 | Closing price (Bloomberg `PX_LAST`) |
-| `px_volume` | float64 | Daily contract volume (Bloomberg `PX_VOLUME`) |
+- **`TSLL_ohlcv.xlsx`**: TSLL daily OHLCV from inception (2022-08-09) to 2026-06-10 via
+  `yfinance`. Loaded by `load_tsll()`.
+- **`Excel3_Underlying_Data.xlsx`**: one sheet per underlying; TSLA sheet is the spot
+  series (via `load_tsla_underlying()`).
+- **`Excel2_LETF_Data.xlsx`**: one sheet per LETF; TSLT via `load_tslt()`.
+- **`Benchmarks.xlsx`**: SPY / QQQ / VIX / US 3M T-bill, via `load_benchmarks()`.
+- **`TSL*_PXLAST_full_filled.xlsx`**: raw filled Bloomberg BDH workbooks, the source
+  files for the processed parquets. Not read directly by analysis code.
 
-#### `TSLL_calls_close.parquet`
+### Borrow rates (`scripts/backtest/borrow_rates.py`)
 
-46,867 rows × 7 columns — daily closing price/volume for 689 TSLL call contracts.
-Date range 2022-08-12 → 2026-06-10 (TSLL options only existed from TSLL inception);
-expiries span 2022-10-21 → 2027-01-15. Strikes $5.00–$35.70 (TSLL price range).
-Contracts per day: median 49, max 118 — **significantly sparser than TSLA options**.
-Same 7-column schema as `TSLA_calls_close.parquet`.
-Loaded by: `load_tsll_calls()`.
+`load_borrow_rates(dates)` returns daily annualized borrow-fee series for TSLA (flat near
+0.40%) and TSLL (quarterly step function, 0.7% to 7.0%, spiking in TSLA volatility
+regimes). This is a stated approximation read from public borrow-fee charts, not measured
+daily securities-finance data.
 
-| Column | Type | Description |
-|---|---|---|
-| `raw_id` | string | Bloomberg security ID |
-| `figi` | string | FIGI |
-| `expiry` | datetime64 | Option expiration date |
-| `strike` | float64 | Strike price (range $5.00–$35.70) |
-| `date` | datetime64 | Trading date |
-| `px_last` | float64 | Closing price (Bloomberg `PX_LAST`) |
-| `px_volume` | int64 | Daily contract volume |
+## 8. Guaranteed-Floor Engine (Final Result)
 
----
+The research notebooks in `scripts/utils/` develop, in sequence, a portfolio hedging
+engine whose maximum drawdown is capped by a closed-form bound rather than an observed
+backtest number. The consolidated, self-contained version is
+`final_guaranteed_floor_project.ipynb`; the full write-up is
+`latex/guaranteed_floor_addendum.tex`.
 
-### Raw OHLCV files (`data/`)
+**Construction.** Each tranche shorts TSLL, buys a long ATM TSLL call, and optionally
+sells an OTM TSLL put (a collar). The per-share worst-case loss (the reservation) is an
+exact algebraic identity, `L = C + K_c - S_0` (call-only) or `L' = C + K_c - S_0 - P_p`
+(collar), valid at any strike and, via no-arbitrage bounds on American options, at every
+instant rather than only at expiry. A settled-equity accounting scheme keys the risk
+budget to checkpoint equity rather than daily marks, which removes procyclicality. A
+cycle ceiling converts equity peaks into checkpoints, yielding the master equation
 
-#### `TSLL_ohlcv.xlsx`
+```
+guaranteed MaxDD  <=  (d + g) / (1 + g)
+```
 
-963 rows × 7 columns — TSLL daily OHLCV from inception (2022-08-09) → 2026-06-10, via
-`yfinance`. Loaded by: `load_tsll()`.
+where `l` is the per-cycle loss budget, `d` the drawdown limit against the settled high
+water mark, `g` the gain trigger, and `q` the deployment cost gate (Latin letters by
+design: alpha, gamma, and delta already carry standard meanings in finance). Setting
+`x = l = d = g` gives a one-parameter risk dial with bound `2x/(1+x)`:
+the investor picks the drawdown guarantee, and the backtest reports what it earned. A
+favorability gate deploys capital only when the net floor cost is at most 15% of
+protected notional.
 
-| Column | Type | Description |
-|---|---|---|
-| `Date` | datetime64 | Trading date |
-| `Open`, `High`, `Low`, `Close` | float64 | Daily OHLC |
-| `Adj Close` | float64 | Dividend/split-adjusted close |
-| `Volume` | int64 | Daily share volume |
+**Results** (2022-08-12 to 2026-06-10, headline config `l=8%, d=8.2%, g=8%, q=15%`,
+guaranteed bound 15.0%):
 
-#### `Excel3_Underlying_Data.xlsx`
+| Strategy | CAGR | Sharpe | Max DD | Calmar |
+|---|---|---|---|---|
+| Collar, frictionless | +15.69% | 0.899 | -12.29% | 1.277 |
+| Collar with borrow (realized) | +10.41% | 0.680 | -15.21% | 0.684 |
+| Call-only, frictionless | +14.00% | 0.841 | -11.29% | 1.240 |
+| Call-only with borrow (realized) | +13.42% | 0.706 | -15.44% | 0.869 |
+| Naked short TSLL (benchmark) | +13.30% | n/a | -79.60% | 0.167 |
 
-One sheet per underlying (13 total); TSLA sheet has 1,571 rows × 8 columns,
-2020-06-01 → 2026-06-08. Generated by pipeline step 00b from Bloomberg BDH.
-Used by the CBA backtest as the TSLA spot series (via `load_tsla_underlying()`).
+Across all configurations tested (four full-period variants, two holdout halves each, and
+seven risk-dial settings), the daily equity path produced zero violations of its
+leak-adjusted analytic floor over 960 days each. Returns are concentrated in the crash
+regime, which is the intended profile for a hedge; the bound holds in every regime.
+Figures in `observations/strategies/final/`.
 
-| Column | Type | Description |
-|---|---|---|
-| `Date` | datetime64 | Trading date |
-| `Open`, `High`, `Low`, `Close` | float64 | Daily OHLC (Bloomberg `PX_OPEN/HIGH/LOW/LAST`) |
-| `Total Return Idx` | float64 | Bloomberg total return index (dividends reinvested) |
-| `Volume` | float64 | Daily share volume |
-| `Mkt Cap ($M)` | float64 | Market capitalisation in $M |
+## 9. Earlier Result: Cost-Benefit Analysis
 
-#### `Excel2_LETF_Data.xlsx`
-
-One sheet per LETF (13 total); TSLT sheet has data from 2023-10-18 (TSLT inception)
-with OHLCV columns. Generated from Bloomberg BDH. Loaded by `load_tslt()`.
-
-| Column | Type | Description |
-|---|---|---|
-| `Date` | datetime64 | Trading date |
-| `Open`, `High`, `Low`, `Close` | float64 | Daily OHLC |
-| `Adj Close` | float64 | Adjusted close |
-| `Volume` | float64 | Daily share volume |
-
-#### `Benchmarks.xlsx`
-
-Multi-block layout (Sheet1, header row 8). Four series loaded by `load_benchmarks()`:
-
-| Series | Columns | Description |
-|---|---|---|
-| SPY | Date, Open, High, Low, Close, Total Return Idx, Volume | S&P 500 ETF daily OHLCV + TRI |
-| QQQ | Date, Open, High, Low, Close, Total Return Idx, Volume | Nasdaq-100 ETF daily OHLCV + TRI |
-| VIX | Date, Open, High, Low, Close | CBOE Volatility Index daily |
-| USGG3M | Date, Yield_3M | US 3-Month T-bill yield (annualised %) |
-
-#### `TSLA_calls_PXLAST_full_filled.xlsx`
-
-Raw Bloomberg BDH workbook (9.6 MB) — the filled source file for `TSLA_calls_close.parquet`.
-Contains a `Securities` sheet (contract metadata: RAW_ID, FIGI, EXPIRY, STRIKE) and
-`Batch_NN` sheets of `[Date | PX_LAST | PX_VOLUME | blank]` blocks, one block per contract.
-Not loaded directly by analysis scripts (parsed once by step 07 into the parquet).
-
----
-
-### `TSLA_spot_ohlcv.{parquet,csv}` *(optional, step 08 output)*
-
-Generated by `08_fetch_ticker_spot_yfinance.py TSLA` if run — not required for the CBA
-backtest, which reads TSLA spot directly from `Excel3_Underlying_Data.xlsx` via
-`load_tsla_underlying()`. Schema matches `TSLL_ohlcv` (Date, Open, High, Low, Close,
-Adj Close, Volume).
-
-## 7. Status & Next Steps
-
-**Data acquisition is complete.** All inputs live as raw Excel files in `data/` —
-`Excel2_LETF_Data.xlsx` (TSLT), `Excel3_Underlying_Data.xlsx` (TSLA spot),
-`TSLL_ohlcv.xlsx` (yfinance), `TSLA_calls_PXLAST_full_filled.xlsx` (3,797 TSLA call
-contracts), `TSLL_calls_PXLAST_full.xlsx` (689 TSLL call contracts), and
-`Benchmarks.xlsx` (SPY/QQQ/VIX/T-bill). The `excel_formula/` pipeline
-(steps 00a-00b, 01-03, 05-09) does not need to be re-run — it was used to *produce*
-these raw files. Analysis scripts read directly from `data/*.xlsx`.
-
-**Cost-Benefit Analysis (CBA) complete** (`scripts/backtest/cba_backtest.py`):
-Compared three strategies over 2022-08-12 → 2026-06-10 (3.8 years), daily roll-check,
-DTE 0-180d, 2% hedge spend per roll, moneyness ATM/10%OTM/20%OTM:
+An exploratory CBA (`scripts/backtest/cba_backtest.py`) compared strategies over
+2022-08-12 to 2026-06-10 with a fixed 2% hedge spend per roll:
 
 | Strategy | CAGR | Ann. Vol | Max DD | Fill Rate |
 |---|---|---|---|---|
-| Benchmark (naked short TSLL) | 13.3% | 67.2% | -79.6% | — |
+| Benchmark (naked short TSLL) | 13.3% | 67.2% | -79.6% | n/a |
 | A-ATM (TSLA call) | 14.0% | 57.1% | -74.2% | ~100% |
-| A-10% OTM (TSLA call) | 15.7% | 49.4% | -68.5% | ~100% |
 | **A-20% OTM (TSLA call)** | **17.4%** | **42.9%** | **-61.2%** | **~100%** |
-| B-ATM (TSLL call) | 14.3% | 52.7% | -71.2% | 57% |
-| B-10% OTM (TSLL call) | 14.8% | 48.0% | -66.7% | 63% |
 | B-20% OTM (TSLL call) | 15.8% | 45.2% | -64.1% | 42% |
 
-Key finding: TSLA calls (Strategy A) dominate on all metrics. 20% OTM TSLA calls deliver
-the best risk-adjusted outcome (+4pp CAGR, -18pp max drawdown vs. benchmark). TSLL calls
-(Strategy B) are severely capacity-constrained — 20% OTM fills only 42% of roll attempts
-(34 miss days), leaving the position unhedged and undermining the strategy.
+Key finding: TSLA calls dominate on a fixed-spend basis, while LETF-native (TSLL) hedges
+are capacity-constrained. The guaranteed-floor engine of Section 8 is LETF-native by
+design (its algebraic floor requires the call and short to be on the same instrument) and
+addresses the sparsity by deploying only when a qualifying contract exists and parking
+otherwise.
 
-Figures → `observations/strategies/cba/`  |  Equity CSVs → `results/cba/`
+## 10. Scope and Limitations
 
-**Next steps:**
-- Refine roll logic (e.g. test wider moneyness bands when TSLL options are unavailable)
-- Sensitivity: vary HEDGE_PCT, TARGET_DTE, ROLL_DTE
-- Extend CBA to include the call-spread variant (long 10%OTM, short 20%OTM) to cap premium spend
-
-## 8. Out of Scope
-
-- Puts — calls only.
-- Bid-ask spreads, Greeks, implied vol — confirmed not needed.
-- Intraday data — end-of-day only.
+- Options: calls are bought and OTM puts are sold (the collar). The earlier "puts not
+  needed" note referred to *buying* puts, which is redundant on an already-short-delta
+  book; *selling* them harvests premium and is a distinct trade.
+- Costs: short-borrow fees are modeled (approximate, quarterly). Bid-ask spreads are the
+  principal unmodeled cost and are adverse; the dataset was scoped to closing prices, so
+  spreads cannot be estimated from it.
+- Data: end-of-day only; thin TSLL chains; trades execute at the observed close; position
+  size is not capped against contract volume; TSLL distributions to the share lender are
+  not modeled.
+- The guaranteed drawdown bound is a theorem given the stated assumptions. Reported CAGRs
+  are a single 3.8-year history.
