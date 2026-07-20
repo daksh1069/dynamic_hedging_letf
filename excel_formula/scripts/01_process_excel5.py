@@ -10,6 +10,7 @@ data/).
 
 No API calls -- pure local file generation, free.
 """
+import os
 import re
 from pathlib import Path
 
@@ -25,6 +26,9 @@ INPUT_FILE  = DATA_DIR / "Excel5_OptionTickers_Final.xlsx"
 OUTPUT_FILE = ROOT / "excel_formula" / "Excel5b_UniqueTickers_ForDecode.xlsx"
 
 SKIP_SHEETS = {"INDEX", "HOW_TO_USE"}
+
+OPT_TYPE  = os.environ.get("OPTION_TYPE", "C").upper()
+OPT_LABEL = "puts" if OPT_TYPE == "P" else "calls"
 
 # BBG ID pattern: BBG followed by alphanumerics, then a Bloomberg asset class suffix
 BBG_PATTERN = re.compile(r"^BBG[A-Z0-9]{9,12}\s+(Equity|Curncy|Comdty|Index)$", re.IGNORECASE)
@@ -84,7 +88,7 @@ idx.sheet_view.showGridLines = False
 
 idx.merge_cells("A1:F1")
 c = idx["A1"]
-c.value = "Excel 5b — Unique Call Option IDs for BDP Decode"
+c.value = f"Excel 5b — Unique {OPT_LABEL.capitalize()} Option IDs for BDP Decode"
 c.font = hfont(size=13); c.fill = fill(NAVY); c.alignment = center()
 idx.row_dimensions[1].height = 28
 
@@ -128,12 +132,12 @@ c.font = hfont(13); c.fill = fill(NAVY); c.alignment = center()
 how.row_dimensions[1].height = 28
 
 steps = [
-    ("PURPOSE",  "This file contains every unique call option BBG ID extracted from Excel 5, deduplicated per underlying. Use it to decode contract metadata (ticker, strike, expiry) via Bloomberg BDP."),
+    ("PURPOSE",  f"This file contains every unique {OPT_LABEL.rstrip('s')} option BBG ID extracted from Excel 5, deduplicated per underlying. Use it to decode contract metadata (ticker, strike, expiry) via Bloomberg BDP."),
     ("STEP 1",   "Copy this file to the Bloomberg Terminal machine (USB / OneDrive / email)."),
     ("STEP 2",   "Open on Bloomberg Terminal. BDP formulas in columns B-E auto-populate with strike, expiry, put/call type, and human-readable ticker."),
     ("STEP 3",   "Once populated: select all → Copy → Paste Special → Values → Save as Excel5b_DECODED.xlsx"),
     ("STEP 4",   "Bring Excel5b_DECODED.xlsx back to your personal machine. Run the next Python script to filter by moneyness and maturity and build Excel 6."),
-    ("COLUMNS",  "A: BBG Global ID  |  B: Human Ticker  |  C: Expiry Date  |  D: Strike Price  |  E: Put/Call (verify = C)"),
+    ("COLUMNS",  f"A: BBG Global ID  |  B: Human Ticker  |  C: Expiry Date  |  D: Strike Price  |  E: Put/Call (verify = {OPT_TYPE})"),
     ("⚠ NOTE",   "BDP may return #N/A for very old expired contracts with limited data. This is normal — those rows can be dropped in Python filtering."),
 ]
 for i, (label, text) in enumerate(steps):
@@ -154,7 +158,7 @@ for name, ids in sheet_ids.items():
     # Title
     ws.merge_cells("A1:E1")
     c = ws["A1"]
-    c.value = f"{name} — {len(ids):,} Unique Call Option IDs → BDP Decode"
+    c.value = f"{name} — {len(ids):,} Unique {OPT_LABEL.capitalize()} Option IDs → BDP Decode"
     c.font = hfont(11); c.fill = fill(NAVY); c.alignment = left()
     ws.row_dimensions[1].height = 22
 

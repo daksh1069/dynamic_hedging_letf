@@ -8,7 +8,7 @@ that spills every call-option BBG ID present in that underlying's chain on
 the first day of that quarter:
 
     =BDS(security,"OPT_CHAIN","SINGLE_DATE_OVERRIDE","YYYYMMDD",
-         "CHAIN_PUT_CALL_TYPE_OVRD","C")
+         "CHAIN_PUT_CALL_TYPE_OVRD","C")   # set OPTION_TYPE=P env var for puts
 
 Workflow: open the saved workbook on a Bloomberg Terminal, let the BDS
 formulas refresh/spill, then "Paste Special -> Values" each sheet and save
@@ -16,6 +16,7 @@ as data/Excel5_OptionTickers_Final.xlsx -- the input to
 excel_formula/scripts/01_process_excel5.py.
 """
 
+import os
 from pathlib import Path
 
 from openpyxl import Workbook
@@ -24,20 +25,14 @@ from openpyxl.utils import get_column_letter
 
 OUT = Path(__file__).resolve().parents[1]
 
+# Set OPTION_TYPE=P in your shell to generate a puts template instead of calls.
+# Output filename is always Excel5_OptionTickers_Final.xlsx so the downstream
+# pipeline (scripts 01-07) works identically for both passes.
+OPT_TYPE = os.environ.get("OPTION_TYPE", "C").upper()  # "C" or "P"
+
 TICKERS = [
-    {"sheet": "MSTR", "bbg": "MSTR US Equity", "desc": "MicroStrategy (underlying of MSTU)",                       "flag": ""},
-    {"sheet": "SMCI", "bbg": "SMCI US Equity", "desc": "Super Micro Computer (underlying of SMCX)",                "flag": ""},
-    {"sheet": "TSLA", "bbg": "TSLA US Equity", "desc": "Tesla (underlying of TSLT)",                               "flag": ""},
-    {"sheet": "COIN", "bbg": "COIN US Equity", "desc": "Coinbase (underlying of CONL)",                            "flag": ""},
-    {"sheet": "PLTR", "bbg": "PLTR US Equity", "desc": "Palantir (underlying of PLTU)",                            "flag": ""},
-    {"sheet": "MU",   "bbg": "MU US Equity",   "desc": "Micron (underlying of MUU)",                               "flag": ""},
-    {"sheet": "XETH", "bbg": "XETH Curncy",    "desc": "Ethereum (underlying of ETHT) ⚠ Non-equity",          "flag": "⚠ CHECK"},
-    {"sheet": "NG1",  "bbg": "NG1 Comdty",     "desc": "Natural Gas Futures (underlying of BOIL) ⚠ Non-equity", "flag": "⚠ CHECK"},
-    {"sheet": "SOXX", "bbg": "SOXX US Equity", "desc": "Semiconductor ETF (underlying of SOXL)",                   "flag": ""},
-    {"sheet": "AVGO", "bbg": "AVGO US Equity", "desc": "Broadcom (underlying of AVL)",                             "flag": ""},
-    {"sheet": "NVO",  "bbg": "NVO US Equity",  "desc": "Novo Nordisk (underlying of NVOX)",                        "flag": ""},
-    {"sheet": "NVDA", "bbg": "NVDA US Equity", "desc": "Nvidia (underlying of NVDL)",                              "flag": ""},
-    {"sheet": "MSOS", "bbg": "MSOS US Equity", "desc": "Cannabis ETF (underlying of MSOX) ⚠ Thin liquidity",  "flag": "⚠ CHECK"},
+    {"sheet": "TSLA", "bbg": "TSLA US Equity", "desc": "Tesla (underlying of TSLT / TSLL hedge fallback)", "flag": ""},
+    {"sheet": "TSLL", "bbg": "TSLL US Equity", "desc": "Direxion 2x TSLA Bull ETF (primary hedge instrument)", "flag": ""},
 ]
 
 NAVY = "1F3864"; BLUE = "2E75B6"; LBLUE = "BDD7EE"
@@ -92,8 +87,8 @@ def build():
     rh(wi, 1, 28)
 
     c = merge(wi, 2, 1, 2, 5)
-    st(c, '  Each sheet: quarterly BDS pulls of call option BBG IDs from Jan 2020 → Jun 2026  |  '
-          'Formula: =BDS(security, "OPT_CHAIN", "SINGLE_DATE_OVERRIDE", date, "CHAIN_PUT_CALL_TYPE_OVRD", "C")',
+    st(c, f'  Each sheet: quarterly BDS pulls of {OPT_TYPE} option BBG IDs from Jan 2020 → Jun 2026  |  '
+          f'Formula: =BDS(security, "OPT_CHAIN", "SINGLE_DATE_OVERRIDE", date, "CHAIN_PUT_CALL_TYPE_OVRD", "{OPT_TYPE}")',
        bg=BLUE, fg=WHITE, bold=False, size=9, italic=True, wrap=True)
     rh(wi, 2, 28)
     rh(wi, 3, 8)
@@ -133,9 +128,9 @@ def build():
                    "(DAPI <Go> on terminal to verify)."),
         ("STEP 2", "Navigate to any underlying sheet (e.g. MSTR, TSLA). Each sheet contains quarterly "
                    "BDS formulas from Q1 2020 → Q2 2026."),
-        ("STEP 3", 'Each column = one quarter. The formula pulls every call option BBG ID that existed '
-                   'on that date via:\n=BDS(security,"OPT_CHAIN","SINGLE_DATE_OVERRIDE","YYYYMMDD",'
-                   '"CHAIN_PUT_CALL_TYPE_OVRD","C")'),
+        ("STEP 3", f'Each column = one quarter. The formula pulls every {OPT_TYPE} option BBG ID that existed '
+                   f'on that date via:\n=BDS(security,"OPT_CHAIN","SINGLE_DATE_OVERRIDE","YYYYMMDD",'
+                   f'"CHAIN_PUT_CALL_TYPE_OVRD","{OPT_TYPE}")'),
         ("STEP 4", "Bloomberg returns BBG Global IDs (e.g. BBG00P7YZLZ9 Equity). These are fully valid "
                    "Bloomberg tickers."),
         ("STEP 5", 'To decode any ID: =BDP("BBG00XXXXX Equity","TICKER") → human ticker\n'
@@ -164,8 +159,8 @@ def build():
             ws.sheet_properties.tabColor = "FFC000"
 
         c = merge(ws, 1, 1, 1, n_cols)
-        st(c, f"  {t['sheet']} — Historical Call Option Chain  |  {t['bbg']}  |  "
-              f"OPT_CHAIN + SINGLE_DATE_OVERRIDE + CHAIN_PUT_CALL_TYPE_OVRD=C",
+        st(c, f"  {t['sheet']} — Historical {OPT_TYPE} Option Chain  |  {t['bbg']}  |  "
+              f"OPT_CHAIN + SINGLE_DATE_OVERRIDE + CHAIN_PUT_CALL_TYPE_OVRD={OPT_TYPE}",
            bg=NAVY, fg=WHITE, bold=True, size=11)
         rh(ws, 1, 22)
 
@@ -180,7 +175,7 @@ def build():
         for qi, (_, date_str) in enumerate(quarters, 2):
             cell = ws.cell(3, qi)
             cell.value = (f'=BDS("{t["bbg"]}","OPT_CHAIN","SINGLE_DATE_OVERRIDE","{date_str}",'
-                           f'"CHAIN_PUT_CALL_TYPE_OVRD","C")')
+                           f'"CHAIN_PUT_CALL_TYPE_OVRD","{OPT_TYPE}")')
             cell.font = Font(name="Courier New", size=8, bold=True, color=DKBLUE)
             cell.fill = PatternFill("solid", fgColor=LBLUE)
             cell.alignment = Alignment(horizontal="left", vertical="center")

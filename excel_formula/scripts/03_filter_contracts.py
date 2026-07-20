@@ -2,8 +2,8 @@
 Stage 0c: read all data/decoded/*_decoded.xlsx files
 (output of 02_decode_openfigi.py), filter to the call options relevant for
 the backtest, and write into data/filtered/:
-  - <TICKER>_calls_filtered.xlsx  (one per underlying)
-  - ALL_calls_filtered.xlsx        (master summary)
+  - <TICKER>_{calls|puts}_filtered.xlsx  (one per underlying; set OPTION_TYPE env var)
+  - ALL_{calls|puts}_filtered.xlsx       (master summary)
   - Excel6_BDH_Ready.xlsx          (Bloomberg BDH formulas -- superseded,
     only PX_LAST is needed; kept for reference)
 
@@ -23,9 +23,9 @@ Usage
   # Without the moneyness filter (faster, still cuts 60-70%)
   python excel_formula/scripts/03_filter_contracts.py --excel3 ""
 
-Output: data/filtered/TSLA_calls_filtered.xlsx (our
-3,797-contract universe) + the same for every other team ticker, plus
-ALL_calls_filtered.xlsx, Excel6_BDH_Ready.xlsx, filter_summary.txt.
+Output: data/filtered/TSLA_{calls|puts}_filtered.xlsx + the same for every
+other ticker, plus ALL_{calls|puts}_filtered.xlsx, Excel6_BDH_Ready.xlsx,
+filter_summary.txt. (Set OPTION_TYPE=C for calls, OPTION_TYPE=P for puts.)
 """
 
 import os
@@ -47,6 +47,9 @@ warnings.filterwarnings("ignore")
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "data"
+
+OPT_TYPE  = os.environ.get("OPTION_TYPE", "C").upper()
+OPT_LABEL = "puts" if OPT_TYPE == "P" else "calls"
 
 DECODED_DIR   = DATA_DIR / "decoded"
 OUTPUT_DIR    = DATA_DIR / "filtered"
@@ -207,11 +210,11 @@ def load_underlying_prices(excel3_path: str) -> "dict[str, pd.Series]":
 
 
 # ── STEP 3: FILTER CONTRACTS ──────────────────────────────────────────────────
-def filter_calls(df: pd.DataFrame, ticker: str,
-                 prices: dict[str, pd.Series]) -> pd.DataFrame:
+def filter_options(df: pd.DataFrame, ticker: str,
+                   prices: dict[str, pd.Series]) -> pd.DataFrame:
 
-    # 3a. Calls only
-    df = df[df["opt_type"].str.strip().str.lower() == "call"].copy()
+    # 3a. Filter to OPT_TYPE ("call" or "put")
+    df = df[df["opt_type"].str.strip().str.lower() == OPT_LABEL.rstrip("s")].copy()
     if df.empty:
         return df
 
@@ -297,7 +300,7 @@ def build_excel6(all_filtered: dict[str, pd.DataFrame]) -> Workbook:
     c.fill = fill(BLUE); c.alignment = lft()
     idx.row_dimensions[2].height = 14
 
-    for col, h in enumerate(["#","Sheet","Contracts","DTE 15-180","Calls Only","→ Bloomberg"], 1):
+    for col, h in enumerate(["#","Sheet","Contracts","DTE 15-180",f"{OPT_LABEL.capitalize()} Only","→ Bloomberg"], 1):
         c = idx.cell(row=4, column=col, value=h)
         c.font = hf(9); c.fill = fill(BLUE); c.alignment = ctr()
 
@@ -331,7 +334,7 @@ def build_excel6(all_filtered: dict[str, pd.DataFrame]) -> Workbook:
         last = get_column_letter(len(COL_HEADERS))
         ws.merge_cells(f"A1:{last}1")
         c = ws["A1"]
-        c.value = (f"{ticker} — {len(cdf):,} Call Options  |  "
+        c.value = (f"{ticker} — {len(cdf):,} {OPT_LABEL.capitalize().rstrip('s')} Options  |  "
                    f"BDH: {BDH_FIELDS.replace(',', ' | ')}")
         c.font = hf(10); c.fill = fill(NAVY); c.alignment = lft()
         ws.row_dimensions[1].height = 22
@@ -408,17 +411,17 @@ def write_summary(all_raw: dict, all_filtered: dict,
         f"Moneyness filter: {'YES (80%-130%)' if excel3_used else 'NO (Excel3 not provided)'}",
         f"DTE filter: {MIN_DTE}-{MAX_DTE} days",
         "=" * 65,
-        f"{'Underlying':<12} {'Raw':>8} {'Calls':>8} {'Filtered':>10} {'Cut %':>8}",
+        f"{'Underlying':<12} {'Raw':>8} {OPT_LABEL.capitalize():>8} {'Filtered':>10} {'Cut %':>8}",
         "-" * 65,
     ]
     total_raw = total_calls = total_filt = 0
     for ticker in sorted(all_raw.keys()):
         raw   = len(all_raw[ticker])
-        calls = int((all_raw[ticker].get("opt_type","").str.lower() == "call").sum())
+        contracts = int((all_raw[ticker].get("opt_type", pd.Series(dtype=str)).str.lower() == OPT_LABEL.rstrip("s")).sum())
         filt  = len(all_filtered.get(ticker, pd.DataFrame()))
-        cut   = (1 - filt / calls) * 100 if calls > 0 else 0
-        lines.append(f"{ticker:<12} {raw:>8,} {calls:>8,} {filt:>10,} {cut:>7.1f}%")
-        total_raw += raw; total_calls += calls; total_filt += filt
+        cut   = (1 - filt / contracts) * 100 if contracts > 0 else 0
+        lines.append(f"{ticker:<12} {raw:>8,} {contracts:>8,} {filt:>10,} {cut:>7.1f}%")
+        total_raw += raw; total_calls += contracts; total_filt += filt
     cut_total = (1 - total_filt / total_calls) * 100 if total_calls > 0 else 0
     lines += [
         "-" * 65,
@@ -426,8 +429,8 @@ def write_summary(all_raw: dict, all_filtered: dict,
         "=" * 65,
         "",
         f"Output files: {output_dir}/",
-        "  → *_calls_filtered.xlsx  (one per underlying)",
-        "  → ALL_calls_filtered.xlsx",
+        f"  → *_{OPT_LABEL}_filtered.xlsx  (one per underlying)",
+        f"  → ALL_{OPT_LABEL}_filtered.xlsx",
         "  → Excel6_BDH_Ready.xlsx  ← take this to Bloomberg terminal",
     ]
     summary_text = "\n".join(lines)
@@ -473,21 +476,21 @@ def main():
     all_filtered_rows = []
 
     for ticker, df in all_raw.items():
-        filtered = filter_calls(df, ticker, prices)
+        filtered = filter_options(df, ticker, prices)
         all_filtered[ticker] = filtered
         all_filtered_rows.append(filtered)
 
-        calls_raw = int((df.get("opt_type", pd.Series()).str.lower() == "call").sum())
-        print(f"  {ticker:8s}: {calls_raw:>5,} calls → {len(filtered):>5,} filtered  "
-              f"({(1-len(filtered)/calls_raw)*100:.0f}% cut)" if calls_raw > 0
-              else f"  {ticker:8s}: 0 calls")
+        n_raw = int((df.get("opt_type", pd.Series(dtype=str)).str.lower() == OPT_LABEL.rstrip("s")).sum())
+        print(f"  {ticker:8s}: {n_raw:>5,} {OPT_LABEL} → {len(filtered):>5,} filtered  "
+              f"({(1-len(filtered)/n_raw)*100:.0f}% cut)" if n_raw > 0
+              else f"  {ticker:8s}: 0 {OPT_LABEL}")
 
     # Write per-underlying files
     print(f"\nWriting filtered files to {args.output_dir}/ ...")
     for ticker, df in all_filtered.items():
         if df.empty:
             continue
-        path = os.path.join(args.output_dir, f"{ticker}_calls_filtered.xlsx")
+        path = os.path.join(args.output_dir, f"{ticker}_{OPT_LABEL}_filtered.xlsx")
         wb = Workbook(); wb.remove(wb.active)
         ws = wb.create_sheet(ticker[:31])
         # Write header
@@ -507,7 +510,7 @@ def main():
     # Write master filtered file
     if all_filtered_rows:
         master_df = pd.concat([df for df in all_filtered_rows if not df.empty], ignore_index=True)
-        master_path = os.path.join(args.output_dir, "ALL_calls_filtered.xlsx")
+        master_path = os.path.join(args.output_dir, f"ALL_{OPT_LABEL}_filtered.xlsx")
         master_df.to_excel(master_path, index=False)
         print(f"  ✓ {master_path}  ({len(master_df):,} total contracts)")
 

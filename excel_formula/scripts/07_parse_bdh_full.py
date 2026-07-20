@@ -1,14 +1,16 @@
 """
-Parse data/<TICKER>_calls_PXLAST_full_filled.xlsx (the
-Bloomberg BDH pull: PX_LAST + PX_VOLUME for all filtered <TICKER> calls,
+Parse data/<TICKER>_{calls|puts}_PXLAST_full_filled.xlsx (the
+Bloomberg BDH pull: PX_LAST + PX_VOLUME for all filtered <TICKER> options,
 2020-01-02 -> 2026-06-10) into a clean long-format table.
+Filename is controlled by the OPTION_TYPE env var: C=calls, P=puts.
 
-Output: data/processed/<TICKER>_calls_close.parquet
+Output: data/processed/<TICKER>_{calls|puts}_close.parquet
   columns: raw_id, figi, expiry, strike, date, px_last, px_volume
 
 Usage: python excel_formula/scripts/07_parse_bdh_full.py TICKER
 """
 import datetime
+import os
 import sys
 from pathlib import Path
 
@@ -21,7 +23,9 @@ TICKER = sys.argv[1]
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "data"
-PATH = DATA_DIR / f"{TICKER}_calls_PXLAST_full_filled.xlsx"
+OPT_TYPE  = os.environ.get("OPTION_TYPE", "C").upper()
+OPT_LABEL = "puts" if OPT_TYPE == "P" else "calls"
+PATH = DATA_DIR / f"{TICKER}_{OPT_LABEL}_PXLAST_full_filled.xlsx"
 
 BLOCK_WIDTH = 4
 
@@ -67,12 +71,12 @@ def main():
     long_df["px_last"] = pd.to_numeric(long_df["px_last"], errors="coerce")
     long_df["px_volume"] = pd.to_numeric(long_df["px_volume"], errors="coerce")
 
-    out_path = DATA_DIR / "processed" / f"{TICKER}_calls_close.parquet"
+    out_path = DATA_DIR / "processed" / f"{TICKER}_{OPT_LABEL}_close.parquet"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     long_df.to_parquet(out_path)
 
     print(f"Rows: {len(long_df):,}")
-    print(f"Unique contracts: {long_df['raw_id'].nunique():,} (expect 3,797)")
+    print(f"Unique contracts: {long_df['raw_id'].nunique():,}")
     print(f"Date range: {long_df['date'].min().date()} -> {long_df['date'].max().date()}")
     print(f"Saved -> {out_path}")
 

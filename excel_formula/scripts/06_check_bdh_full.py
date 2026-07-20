@@ -1,5 +1,6 @@
 """
-Sanity-check data/<TICKER>_calls_PXLAST_full_filled.xlsx.
+Sanity-check data/<TICKER>_{calls|puts}_PXLAST_full_filled.xlsx.
+(Filename is controlled by the OPTION_TYPE env var: C=calls, P=puts.)
 
 For each Batch_NN sheet, walk each [Date | PX_LAST | PX_VOLUME | blank] block
 (one per security) and check:
@@ -10,6 +11,7 @@ For each Batch_NN sheet, walk each [Date | PX_LAST | PX_VOLUME | blank] block
 Usage: python excel_formula/scripts/06_check_bdh_full.py TICKER
 """
 import datetime
+import os
 import sys
 from pathlib import Path
 
@@ -20,7 +22,9 @@ if len(sys.argv) < 2:
 TICKER = sys.argv[1]
 
 ROOT = Path(__file__).resolve().parents[2]
-PATH = ROOT / "data" / f"{TICKER}_calls_PXLAST_full_filled.xlsx"
+OPT_TYPE  = os.environ.get("OPTION_TYPE", "C").upper()
+OPT_LABEL = "puts" if OPT_TYPE == "P" else "calls"
+PATH = ROOT / "data" / f"{TICKER}_{OPT_LABEL}_PXLAST_full_filled.xlsx"
 
 BLOCK_WIDTH = 4
 ERROR_STRINGS = {"#NAME?", "#N/A", "#REF!", "#VALUE!", "#NULL!", "#DIV/0!", "#NUM!"}
@@ -79,7 +83,7 @@ def main():
             if block_has_error:
                 error_blocks.append((name, label))
 
-    print(f"Securities found: {total_securities:,} (expect 3,797)")
+    print(f"Securities found: {total_securities:,}")
     print(f"Total data rows (date x security): {total_rows:,}")
     print(f"Date range: {min_date.date() if min_date else None} -> {max_date.date() if max_date else None}")
     print(f"Empty blocks (0 rows): {len(empty_blocks)}")

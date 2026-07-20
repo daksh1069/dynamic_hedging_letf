@@ -4,8 +4,9 @@ options' closing prices (PX_LAST) and volume (PX_VOLUME), 2020-01-01 ->
 2026-06-10.
 
 TICKER is required as the first command-line argument -- it drives both the
-input (data/filtered/<TICKER>_calls_filtered.xlsx) and the output filename
-(excel_formula/<TICKER>_calls_PXLAST_full.xlsx).
+input (data/filtered/<TICKER>_{calls|puts}_filtered.xlsx) and the output filename
+(excel_formula/<TICKER>_{calls|puts}_PXLAST_full.xlsx).
+Set OPTION_TYPE env var to C (default) for calls or P for puts.
 
 Usage: python excel_formula/scripts/05_prep_ticker_bdh_full.py TICKER
 
@@ -18,10 +19,11 @@ Batched into sheets of BATCH_SIZE securities (=BATCH_SIZE*4 columns) so the
 user can refresh + "Paste Special -> Values" one sheet at a time on a
 Bloomberg Terminal, checkpointing as they go.
 
-Output: excel_formula/<TICKER>_calls_PXLAST_full.xlsx
+Output: excel_formula/<TICKER>_{calls|puts}_PXLAST_full.xlsx
 
 No Databento/Bloomberg API calls -- pure local file generation, free.
 """
+import os
 import sys
 from pathlib import Path
 
@@ -34,6 +36,8 @@ TICKER = sys.argv[1]
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT_DIR = ROOT / "excel_formula"
+OPT_TYPE  = os.environ.get("OPTION_TYPE", "C").upper()
+OPT_LABEL = "puts" if OPT_TYPE == "P" else "calls"
 
 START = "1/1/2020"
 END = "6/10/2026"
@@ -41,10 +45,9 @@ BATCH_SIZE = 200
 BLOCK_WIDTH = 4  # Date | PX_LAST | PX_VOLUME | blank
 
 INSTRUCTIONS = [
-    f"{TICKER} call option closing prices -- FULL Bloomberg BDH workbook",
+    f"{TICKER} {OPT_LABEL} closing prices -- FULL Bloomberg BDH workbook",
     "",
-    "3,797 contracts, batched into sheets of "
-    f"{BATCH_SIZE} securities ({BATCH_SIZE * BLOCK_WIDTH} columns each).",
+    f"Batched into sheets of {BATCH_SIZE} securities ({BATCH_SIZE * BLOCK_WIDTH} columns each).",
     "Each security gets a [Date | PX_LAST | PX_VOLUME | blank] block with one",
     "=BDH() formula in row 3 that spills downward.",
     "",
@@ -68,10 +71,10 @@ INSTRUCTIONS = [
 
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = OUT_DIR / f"{TICKER}_calls_PXLAST_full.xlsx"
+    out_path = OUT_DIR / f"{TICKER}_{OPT_LABEL}_PXLAST_full.xlsx"
 
     filt = pd.read_excel(
-        ROOT / "data" / "filtered" / f"{TICKER}_calls_filtered.xlsx",
+        ROOT / "data" / "filtered" / f"{TICKER}_{OPT_LABEL}_filtered.xlsx",
         sheet_name=TICKER,
     )
     sec = filt[["RAW_ID", "DESCRIPTION", "EXPIRY", "STRIKE", "FIGI"]].sort_values(

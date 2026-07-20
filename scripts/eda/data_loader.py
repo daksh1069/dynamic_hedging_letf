@@ -141,6 +141,24 @@ def load_tsll_calls() -> pd.DataFrame:
     return pd.read_parquet(DATA_DIR / "processed" / "TSLL_calls_close.parquet")
 
 
+def load_tsla_puts() -> pd.DataFrame:
+    """Long-format TSLA put option closing prices.
+
+    Reads the pre-parsed cache at data/processed/TSLA_puts_close.parquet.
+    Columns: raw_id, figi, expiry, strike, date, px_last, px_volume
+    """
+    return pd.read_parquet(DATA_DIR / "processed" / "TSLA_puts_close.parquet")
+
+
+def load_tsll_puts() -> pd.DataFrame:
+    """Long-format TSLL put option closing prices.
+
+    Reads the pre-parsed cache at data/processed/TSLL_puts_close.parquet.
+    Columns: raw_id, figi, expiry, strike, date, px_last, px_volume
+    """
+    return pd.read_parquet(DATA_DIR / "processed" / "TSLL_puts_close.parquet")
+
+
 if __name__ == "__main__":
     tsla = load_tsla_underlying()
     tslt = load_tslt()
