@@ -78,6 +78,10 @@ dynamic_hedging_project/
 |       |-- TSLA_puts_close.parquet
 |       +-- TSLL_puts_close.parquet
 |
+|-- docs/                          # -- strategy documentation + master results index --
+|   |-- README.md                      # index; per-strategy docs in docs/strategies/
+|   +-- results.md                     # every published number and how to reproduce it
+|
 |-- scripts/                       # -- all analysis code --
 |   |-- eda/
 |   |   |-- data_loader.py             # shared loaders (calls, puts, spot, OHLCV, benchmarks)
@@ -87,7 +91,11 @@ dynamic_hedging_project/
 |   |   |-- options_selection.py       # contract picker (moneyness bucket + DTE)
 |   |   |-- borrow_rates.py            # approximate TSLA/TSLL borrow-fee series
 |   |   +-- engine.py, metrics.py, grid_search.py
-|   |-- strategies/                    # naked short, delta-arb, convexity, double-short
+|   |-- strategies/                    # all strategy implementations
+|   |   |-- double_short.py, delta_arb.py, convexity_protection.py, compare_all.py
+|   |   |-- static_guaranteed_floor.py # Convexity Protection final static port (+19.42%)
+|   |   +-- floor_engine/              # PRODUCTION engine (drawdown-constrained convexity
+|   |       +-- reproduce_results.py   #   protection); reproduces every published result
 |   +-- utils/                         # research notebooks (see Section 8)
 |       |-- final_guaranteed_floor_project.ipynb   # <-- consolidated final result
 |       |-- continuous_capital_recycling_sandbox.ipynb
@@ -100,8 +108,8 @@ dynamic_hedging_project/
 |
 |-- results/                        # -- backtest output CSVs --
 +-- latex/                          # -- project report --
-    |-- main.tex                       # (maintained on Overleaf; build artifacts in repo)
-    +-- guaranteed_floor_addendum.tex  # addendum: the guaranteed-floor engine (Section 8)
+    +-- tsla_tsll_hedging_report.tex   # complete self-contained report (lit review,
+                                       #   all four strategies, the engine, results)
 ```
 
 ### Conventions for `scripts/`, `observations/`, and `results/`
@@ -150,10 +158,18 @@ All notebooks and scripts run from the project root using the venv interpreter.
 # EDA
 venv/bin/python3 scripts/eda/market_data_eda.py
 
-# The final guaranteed-floor engine (consolidated, self-contained):
-venv/bin/jupyter nbconvert --to notebook --execute --inplace \
-  scripts/utils/final_guaranteed_floor_project.ipynb
+# The final engine, production entry point (reproduces every published result,
+# fails loudly if any guarantee or reproduction check does not hold):
+venv/bin/python3 scripts/strategies/floor_engine/reproduce_results.py
+
 ```
+
+The research notebooks behind the engine are archived locally in
+`scripts/utils/sandbox/prod_experiments/` (gitignored; the production package
+reproduces every published number).
+
+Strategy documentation, including the rejected strategies and the master
+results index, lives in `docs/`.
 
 ## 6. Data Pipeline
 
@@ -227,7 +243,7 @@ The research notebooks in `scripts/utils/` develop, in sequence, a portfolio hed
 engine whose maximum drawdown is capped by a closed-form bound rather than an observed
 backtest number. The consolidated, self-contained version is
 `final_guaranteed_floor_project.ipynb`; the full write-up is
-`latex/guaranteed_floor_addendum.tex`.
+`latex/tsla_tsll_hedging_report.tex`.
 
 **Construction.** Each tranche shorts TSLL, buys a long ATM TSLL call, and optionally
 sells an OTM TSLL put (a collar). The per-share worst-case loss (the reservation) is an
