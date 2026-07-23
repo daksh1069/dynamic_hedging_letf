@@ -1,0 +1,133 @@
+{
+  "package": "Strategy-neutral PTIR–PLTR shared data",
+  "created_timestamp_utc": "2026-07-20T00:34:45.902895+00:00",
+  "project_root": "/Users/deeeer/Downloads/LETF Hedging Project/dynamic_hedging_letf/PLTR_LETF_Analysis",
+  "files": [
+    {
+      "filename": "README.md",
+      "file_size_bytes": 6455,
+      "row_count": null,
+      "column_count": null,
+      "sha256": "80de753be081968ca0f05ecad7de4134ce6462669a01ae31a7b03c602a9825b5",
+      "authoritative_source_files": [
+        "build_shared_dataset.py"
+      ],
+      "date_range": null
+    },
+    {
+      "filename": "build_shared_dataset.py",
+      "file_size_bytes": 50969,
+      "row_count": null,
+      "column_count": null,
+      "sha256": "1f9bdaddc5cd3f3370595903246e1a92141449fd25240f18dcf5df54a96e7e11",
+      "authoritative_source_files": [],
+      "date_range": null
+    },
+    {
+      "filename": "data_dictionary.md",
+      "file_size_bytes": 15781,
+      "row_count": null,
+      "column_count": null,
+      "sha256": "add5cf66790865da713f0012428ffc1186b819fe53edd71528be58d492bf58e4",
+      "authoritative_source_files": [
+        "build_shared_dataset.py"
+      ],
+      "date_range": null
+    },
+    {
+      "filename": "data_validation_report.csv",
+      "file_size_bytes": 1560,
+      "row_count": 26,
+      "column_count": 5,
+      "sha256": "c8cc53d77f4cc15ed2d07c41702e8f544914b0eda686748f99d8522b8c039ce8",
+      "authoritative_source_files": [
+        "Data/pltr_related_raw_prices.csv",
+        "Data/PTIR_clean_price_data.csv",
+        "Data/databento/pltr_selected_calls_ohlcv_1d_aggregated.parquet",
+        "Data/databento/pltr_call_universe_unique.parquet"
+      ],
+      "date_range": null
+    },
+    {
+      "filename": "pltr_atm35_reference_contracts.csv",
+      "file_size_bytes": 108210,
+      "row_count": 445,
+      "column_count": 17,
+      "sha256": "20821a30cd6c472e0634a70871715cb4a4de101d8ce141df135c454a3d49bf3a",
+      "authoritative_source_files": [
+        "Data/databento/pltr_selected_calls_ohlcv_1d_aggregated.parquet",
+        "Data/databento/pltr_call_universe_unique.parquet",
+        "Data/pltr_related_raw_prices.csv",
+        "Data/processed/px_bt_with_iv.parquet"
+      ],
+      "date_range": {
+        "first": "2024-09-04",
+        "last": "2026-06-12"
+      }
+    },
+    {
+      "filename": "pltr_options_daily_long.parquet",
+      "file_size_bytes": 2384848,
+      "row_count": 102407,
+      "column_count": 19,
+      "sha256": "a826e2b634f946fb2a41215f66556dcbe153aef3618c48e71b6d26e1267fabf4",
+      "authoritative_source_files": [
+        "Data/databento/pltr_selected_calls_ohlcv_1d_aggregated.parquet",
+        "Data/databento/pltr_call_universe_unique.parquet",
+        "Data/pltr_related_raw_prices.csv"
+      ],
+      "date_range": {
+        "first": "2024-09-04",
+        "last": "2026-06-12"
+      }
+    },
+    {
+      "filename": "pltr_options_daily_sample.csv",
+      "file_size_bytes": 111329,
+      "row_count": 500,
+      "column_count": 19,
+      "sha256": "0ad9a7e4af3f98dd6ee2d5ec4c098e8d8daa46e5e53514a52630a50db6c463ff",
+      "authoritative_source_files": [
+        "pltr_options_daily_long.parquet"
+      ],
+      "date_range": {
+        "first": "2024-09-04",
+        "last": "2024-09-10"
+      }
+    },
+    {
+      "filename": "ptir_pltr_alignment_audit.csv",
+      "file_size_bytes": 56743,
+      "row_count": 1450,
+      "column_count": 5,
+      "sha256": "1f245be9819148e865a837bb68c7cb5bc93fad7460b72ab13c0273af2e27462f",
+      "authoritative_source_files": [
+        "Data/pltr_related_raw_prices.csv"
+      ],
+      "date_range": {
+        "first": "2020-09-30",
+        "last": "2026-07-10"
+      }
+    },
+    {
+      "filename": "ptir_pltr_daily_master.csv",
+      "file_size_bytes": 106569,
+      "row_count": 463,
+      "column_count": 22,
+      "sha256": "d014c49725e5f80ca9669cd551679bd3afd8a9611ef14442181bdce1bfc43b4d",
+      "authoritative_source_files": [
+        "Data/pltr_related_raw_prices.csv",
+        "Data/PTIR_clean_price_data.csv"
+      ],
+      "date_range": {
+        "first": "2024-09-04",
+        "last": "2026-07-10"
+      }
+    }
+  ],
+  "manifest_self_entry": {
+    "filename": "manifest.json",
+    "sha256": null,
+    "notes": "A manifest cannot contain its own stable SHA-256 checksum because that value changes the file."
+  }
+}
