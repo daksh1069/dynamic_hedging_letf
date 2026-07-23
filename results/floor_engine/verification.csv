@@ -1,5 +1,0 @@
-label,floor_violations,raw_floor_days_below,days,realized_maxdd,bound_frictionless,bound_leak_adjusted,within_bound,max_leak_dB,max_cycle_borrow
-Collar (frictionless),0,0,960,-0.1228828564919594,0.15,0.15,True,0.0,0.0
-Collar with borrow (realized),0,39,960,-0.15207015160387494,0.15,0.17537944358333732,True,0.042571778481861194,0.013274941634228085
-Call-only (frictionless),0,0,960,-0.11291272722955559,0.15,0.15,True,0.0,0.0
-Call-only with borrow (realized),0,65,960,-0.15440580731994036,0.15,0.16227936703260712,True,0.0232273585687386,0.016922779875406732
