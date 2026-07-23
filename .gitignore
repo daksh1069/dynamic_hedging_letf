@@ -1,9 +1,0 @@
-.env
-venv/
-__pycache__/
-*.pyc
-.DS_Store
-.claude/
-latex/
-.ipynb_checkpoints/
-scripts/utils/sandbox/prod_experiments/
